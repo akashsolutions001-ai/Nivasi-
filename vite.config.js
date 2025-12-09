@@ -28,14 +28,9 @@ export default defineConfig({
         }
       }
     },
-    // Enable minification and tree shaking
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    },
+    // Enable minification and tree shaking (using esbuild - faster and included with Vite)
+    minify: 'esbuild',
+    // esbuild automatically removes console and debugger in production
     // Optimize chunk size
     chunkSizeWarningLimit: 1000
   },
