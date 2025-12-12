@@ -4,9 +4,6 @@ Allow: /
 # Disallow admin and private areas
 Disallow: /admin/
 Disallow: /private/
-Disallow: /api/
-Disallow: /_next/
-Disallow: /node_modules/
 
 # Allow important files
 Allow: /sitemap.xml
