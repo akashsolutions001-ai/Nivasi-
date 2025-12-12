@@ -6,7 +6,7 @@
 
   <!-- Homepage -->
   <url>
-    <loc>https://nivasi.space/</loc>
+    <loc>https://nivasispace.com/</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -14,7 +14,7 @@
 
   <!-- Room Listings -->
   <url>
-    <loc>https://nivasi.space/rooms</loc>
+    <loc>https://nivasispace.com/rooms</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -22,7 +22,7 @@
 
   <!-- Boys Rooms -->
   <url>
-    <loc>https://nivasi.space/rooms/boys</loc>
+    <loc>https://nivasispace.com/rooms/boys</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -30,7 +30,7 @@
 
   <!-- Girls Rooms -->
   <url>
-    <loc>https://nivasi.space/rooms/girls</loc>
+    <loc>https://nivasispace.com/rooms/girls</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -38,7 +38,7 @@
 
   <!-- Single Room Category -->
   <url>
-    <loc>https://nivasi.space/category/single-room</loc>
+    <loc>https://nivasispace.com/category/single-room</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -46,7 +46,7 @@
 
   <!-- 1 RK Category -->
   <url>
-    <loc>https://nivasi.space/category/1-rk</loc>
+    <loc>https://nivasispace.com/category/1-rk</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -54,7 +54,7 @@
 
   <!-- 1 BHK Category -->
   <url>
-    <loc>https://nivasi.space/category/1-bhk</loc>
+    <loc>https://nivasispace.com/category/1-bhk</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -62,7 +62,7 @@
 
   <!-- 2 BHK Category -->
   <url>
-    <loc>https://nivasi.space/category/2-bhk</loc>
+    <loc>https://nivasispace.com/category/2-bhk</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -70,7 +70,7 @@
 
   <!-- Cot Basis Category -->
   <url>
-    <loc>https://nivasi.space/category/cot-basis</loc>
+    <loc>https://nivasispace.com/category/cot-basis</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -78,7 +78,7 @@
 
   <!-- About Us -->
   <url>
-    <loc>https://nivasi.space/about</loc>
+    <loc>https://nivasispace.com/about</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -86,7 +86,7 @@
 
   <!-- Contact Us -->
   <url>
-    <loc>https://nivasi.space/contact</loc>
+    <loc>https://nivasispace.com/contact</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -94,7 +94,7 @@
 
   <!-- Add Room -->
   <url>
-    <loc>https://nivasi.space/add-room</loc>
+    <loc>https://nivasispace.com/add-room</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -102,7 +102,7 @@
 
   <!-- Search Results -->
   <url>
-    <loc>https://nivasi.space/search</loc>
+    <loc>https://nivasispace.com/search</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
@@ -110,7 +110,7 @@
 
   <!-- Privacy Policy -->
   <url>
-    <loc>https://nivasi.space/privacy</loc>
+    <loc>https://nivasispace.com/privacy</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
@@ -118,7 +118,7 @@
 
   <!-- Terms of Service -->
   <url>
-    <loc>https://nivasi.space/terms</loc>
+    <loc>https://nivasispace.com/terms</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
@@ -126,7 +126,7 @@
 
   <!-- Help/FAQ -->
   <url>
-    <loc>https://nivasi.space/help</loc>
+    <loc>https://nivasispace.com/help</loc>
     <lastmod>2024-12-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

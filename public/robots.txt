@@ -17,3 +17,6 @@ Allow: /favicon.ico
 
 # Sitemap location
 Sitemap: https://nivasispace.com/sitemap.xml
+
+# Primary domain
+Host: https://nivasispace.com

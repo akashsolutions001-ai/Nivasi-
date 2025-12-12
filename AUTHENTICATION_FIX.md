@@ -76,7 +76,7 @@ This error occurs when:
 ### Required Settings:
 1. **Authorized Domains**: Add your domain to Firebase Console
    - Go to Authentication > Settings > Authorized Domains
-   - Add: `nivasi.space`, `localhost` (for development)
+   - Add: `nivasispace.com`, `localhost` (for development)
 
 2. **OAuth Consent Screen**: Configure Google OAuth
    - Add your domain to authorized origins

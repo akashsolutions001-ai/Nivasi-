@@ -787,7 +787,7 @@ function App() {
                     <div className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
                       <span className="text-white text-xs">✉️</span>
                     </div>
-                    <p className="text-gray-300 text-sm">contact@nivasi.space</p>
+                    <p className="text-gray-300 text-sm">contact@nivasispace.com</p>
                   </div>
                 </div>
               </div>
@@ -996,10 +996,10 @@ function App() {
                     <div>
                       <h3 className="font-semibold text-green-800 mb-1">✉️ Email</h3>
                       <a 
-                        href="mailto:contact@nivasi.space"
+                        href="mailto:contact@nivasispace.com"
                         className="text-sm text-green-700 hover:text-green-900 transition-colors"
                       >
-                        contact@nivasi.space
+                        contact@nivasispace.com
                       </a>
                     </div>
                   </div>
@@ -1016,7 +1016,7 @@ function App() {
                   </Button>
                   
                   <Button
-                    onClick={() => window.open('mailto:contact@nivasi.space', '_self')}
+                    onClick={() => window.open('mailto:contact@nivasispace.com', '_self')}
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

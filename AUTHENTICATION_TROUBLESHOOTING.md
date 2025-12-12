@@ -153,13 +153,13 @@ console.log('LoginScreen: Recommended auth method:', recommendedMethod);
 1. **Authorized Domains**
    ```
    Go to: Firebase Console → Authentication → Settings → Authorized Domains
-   Add: nivasi.space, localhost (for development)
+   Add: nivasispace.com, localhost (for development)
    ```
 
 2. **OAuth Consent Screen**
    ```
    Go to: Google Cloud Console → APIs & Services → OAuth consent screen
-   Add authorized origins: https://nivasi.space
+   Add authorized origins: https://nivasispace.com
    Configure scopes: email, profile
    ```
 
