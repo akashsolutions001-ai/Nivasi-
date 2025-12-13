@@ -1,4 +1,4 @@
-# Authentication Fix for Nivasi.space
+# Authentication Fix for nivasispace.com
 
 ## Problem
 The app was showing a "disallowed_useragent" error and "Use secure browsers" policy error when trying to authenticate with Google Firebase.
@@ -109,7 +109,7 @@ This error occurs when:
 ## Best Practices
 
 ### For Users:
-1. Use the Nivasi Space app for the best experience
+1. Use the nivasispace.com app for the best experience
 2. Open in default browser if WebView issues occur
 3. Allow popups if using web version
 
@@ -138,5 +138,5 @@ This error occurs when:
 
 If you continue to experience authentication issues:
 1. Try opening the link in your default browser
-2. Install the Nivasi Space app
+2. Install the nivasispace.com app
 3. Contact support with error details and device information

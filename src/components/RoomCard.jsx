@@ -79,7 +79,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, isFirst, onBookNo
           ) : (
             <div className="text-center w-full">
               <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                <img src="/logo.svg" alt="Nivasi.space Logo" className="w-12 h-12 object-contain" />
+                <img src="/logo.svg" alt="nivasispace.com Logo" className="w-12 h-12 object-contain" />
               </div>
               <p className="text-gray-500 text-sm">{t('noImageAvailable')}</p>
             </div>

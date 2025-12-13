@@ -1,6 +1,6 @@
-# Nivasi.space - College Room Rental Website - Orange & White Theme
+# nivasispace.com - College Room Rental Website - Orange & White Theme
 
-A modern, vibrant, and user-friendly room rental platform designed specifically for college students. Features a beautiful orange and white color scheme with smooth animations and enhanced user experience. Powered by Nivasi.space.
+A modern, vibrant, and user-friendly room rental platform designed specifically for college students. Features a beautiful orange and white color scheme with smooth animations and enhanced user experience. Powered by nivasispace.com.
 
 ## ✨ Enhanced Features
 
@@ -288,7 +288,7 @@ Room objects should follow this structure:
 This project is open source and available under the MIT License.
 
 ## Support
-For support, visit [Nivase.com](https://nivase.com) or contact us at support@nivase.com.
+For support, visit [nivasispace.com](https://nivasispace.com) or contact us at contact@nivasispace.com.
 
 ---
 

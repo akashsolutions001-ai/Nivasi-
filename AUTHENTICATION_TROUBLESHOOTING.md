@@ -244,7 +244,7 @@ console.log('LoginScreen: Recommended auth method:', recommendedMethod);
 
 ### For Users:
 1. Try opening the link in your default browser
-2. Install the Nivasi Space app for best experience
+2. Install the nivasispace.com app for best experience
 3. Contact support with error details and device information
 
 ### For Developers:
@@ -260,7 +260,7 @@ console.log('LoginScreen: Recommended auth method:', recommendedMethod);
 2. **Try Different Browser:** Use Chrome, Firefox, or Safari
 3. **Disable Extensions:** Temporarily disable browser extensions
 4. **Check Network:** Ensure stable internet connection
-5. **Use App:** Install and use the Nivasi Space app
+5. **Use App:** Install and use the nivasispace.com app
 
 ### For Persistent Issues:
 1. **Contact Support:** Provide error details and device information

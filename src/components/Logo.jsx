@@ -11,7 +11,7 @@ const Logo = ({ className = "", size = "default" }) => {
     <div className={`${sizeClasses[size]} flex items-center justify-center ${className}`}>
       <img 
         src="/logo.svg" 
-        alt="Nivasi.space Logo" 
+        alt="nivasispace.com Logo" 
         className={`${size === 'small' ? 'w-10 h-10' : size === 'large' ? 'w-16 h-16' : 'w-12 h-12'} object-contain`}
       />
     </div>

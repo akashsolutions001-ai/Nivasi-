@@ -138,10 +138,10 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* Logo Section */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <img src="/logo.svg" alt="Nivasi.space Logo" className="w-12 h-12 object-contain" />
+            <img src="/logo.svg" alt="nivasispace.com Logo" className="w-12 h-12 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {t('title') || 'Nivasi.space'}
+            {t('title') || 'nivasispace.com'}
           </h1>
           <p className="text-gray-600">
             {t('tagline') || 'College Room Rental - Find your perfect room near campus'}
@@ -190,7 +190,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 🔗 You'll be redirected to your default browser for secure authentication
               </p>
               <p className="text-blue-600 text-xs text-center mt-1">
-                For the best experience, install the Nivasi Space app
+                For the best experience, install the nivasispace.com app
               </p>
             </div>
           )}
@@ -248,7 +248,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-500">
-            {t('poweredBy') || 'Powered by Nivasi.space - Your trusted college room rental platform'}
+            {t('poweredBy') || 'Powered by nivasispace.com - Your trusted college room rental platform'}
           </p>
         </div>
       </div>

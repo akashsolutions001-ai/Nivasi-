@@ -1,8 +1,8 @@
-# 📋 **Nivase.com - College Room Rental Website Documentation**
+# 📋 **nivasispace.com - College Room Rental Website Documentation**
 
 ## 🎯 **Project Overview**
 
-**Project Name**: Nivase.com - College Room Rental Platform  
+**Project Name**: nivasispace.com - College Room Rental Platform  
 **Technology Stack**: React + Vite + Tailwind CSS + Radix UI  
 **Target Audience**: College students seeking accommodation  
 **Languages Supported**: English, Hindi, Marathi  
@@ -108,27 +108,27 @@ const room = {
 ### **1. Search Engine Optimization**
 ```html
 <!-- Meta Tags Implemented -->
-<title>Nivase.com - College Room Rental | Find Your Perfect Room</title>
+<title>nivasispace.com - College Room Rental | Find Your Perfect Room</title>
 <meta name="description" content="Find affordable college rooms near your campus">
 <meta name="keywords" content="college rooms, student accommodation, room rental">
-<meta name="author" content="Nivase.com">
+<meta name="author" content="nivasispace.com">
 
 <!-- Open Graph Tags -->
-<meta property="og:title" content="Nivase.com - College Room Rental">
+<meta property="og:title" content="nivasispace.com - College Room Rental">
 <meta property="og:description" content="Find your perfect college room">
 <meta property="og:type" content="website">
 
 <!-- Twitter Card Tags -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Nivase.com - College Room Rental">
+<meta name="twitter:title" content="nivasispace.com - College Room Rental">
 ```
 
 ### **2. Progressive Web App Features**
 ```json
 // manifest.json Configuration
 {
-  "name": "Nivase.com - College Room Rental",
-  "short_name": "Nivase",
+  "name": "nivasispace.com - College Room Rental",
+  "short_name": "Nivasi",
   "description": "Find your perfect college room",
   "start_url": "/",
   "display": "standalone",
@@ -556,8 +556,8 @@ const LanguageContext = createContext({
 ### **Manifest Configuration**
 ```json
 {
-  "name": "Nivase.com - College Room Rental",
-  "short_name": "Nivase",
+  "name": "nivasispace.com - College Room Rental",
+  "short_name": "Nivasi",
   "description": "Find your perfect college room",
   "start_url": "/",
   "display": "standalone",
@@ -755,7 +755,7 @@ npm run preview
 
 ## 📝 **Conclusion**
 
-The Nivase.com College Room Rental platform represents a **comprehensive, production-ready solution** for the student accommodation market. With its modern architecture, multilingual support, and focus on user experience, it provides a solid foundation for connecting students with suitable housing options.
+The nivasispace.com College Room Rental platform represents a **comprehensive, production-ready solution** for the student accommodation market. With its modern architecture, multilingual support, and focus on user experience, it provides a solid foundation for connecting students with suitable housing options.
 
 The project demonstrates best practices in:
 - **Modern Web Development**

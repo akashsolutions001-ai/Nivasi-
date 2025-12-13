@@ -634,7 +634,7 @@ function App() {
             {activeSection === 'rooms' ? t('availableRooms') : 'Available Mess Options'}
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 mt-2 px-4">
-            {activeSection === 'rooms' ? t('poweredBy') : 'Powered by Nivasi.space'}
+            {activeSection === 'rooms' ? t('poweredBy') : 'Powered by nivasispace.com'}
           </p>
           <div className="w-16 sm:w-24 h-1 bg-gradient-to-r from-purple-400 to-pink-400 mx-auto mt-4 rounded-full"></div>
         </div>
@@ -684,7 +684,7 @@ function App() {
         {filteredRooms.length === 0 && selectedGender && (
           <div className="text-center py-16 animate-fade-scale">
             <div className="w-28 h-28 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center mx-auto mb-6">
-              <img src="/logo.svg" alt="Nivasi.space Logo" className="w-16 h-16 object-contain" />
+              <img src="/logo.svg" alt="nivasispace.com Logo" className="w-16 h-16 object-contain" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
               {t('noRoomsForGender')} {selectedGender === 'boy' ? t('boys') : t('girls')}
@@ -706,7 +706,7 @@ function App() {
         {filteredRooms.length === 0 && !selectedGender && (
           <div className="text-center py-16 animate-fade-scale">
             <div className="w-28 h-28 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center mx-auto mb-6">
-              <img src="/logo.svg" alt="Nivasi.space Logo" className="w-16 h-16 object-contain" />
+              <img src="/logo.svg" alt="nivasispace.com Logo" className="w-16 h-16 object-contain" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">{t('welcomeToNivase')}</h3>
             <p className="text-gray-600 mb-6">{t('collegeRoomRental')} - {t('beFirstToAddGeneral')}</p>
@@ -755,7 +755,7 @@ function App() {
                     <span className="text-white text-2xl">🏠</span>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-white">NIVASI.SPACE</h3>
+                    <h3 className="text-2xl font-bold text-white">NIVASISPACE.COM</h3>
                     <p className="text-orange-300 text-sm font-medium"></p>
                   </div>
                 </div>

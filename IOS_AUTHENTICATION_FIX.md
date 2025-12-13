@@ -190,13 +190,13 @@ useEffect(() => {
 ```javascript
 // iOS-specific error messages
 if (isIOS) {
-  return 'Google Sign-In requires a secure browser on iOS. Please try opening this link in Safari or install the Nivasi Space app.';
+  return 'Google Sign-In requires a secure browser on iOS. Please try opening this link in Safari or install the nivasispace.com app.';
 }
 
 // iOS-specific solution suggestions
 if (isIOS) {
   suggestions.push('Open this link in Safari for better compatibility');
-  suggestions.push('Install the Nivasi Space app for the best experience');
+  suggestions.push('Install the nivasispace.com app for the best experience');
   suggestions.push('Try refreshing the page and signing in again');
 }
 ```

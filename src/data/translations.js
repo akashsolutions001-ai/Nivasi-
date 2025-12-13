@@ -1,7 +1,7 @@
 export const translations = {
 en: {
   // Header
-  title: "Nivasi.space",
+  title: "nivasispace.com",
   tagline: "College Room Rental - Find your perfect room near campus",
   changeGender: "Change Location or Gender",
   addRoom: "Add Room",
@@ -17,26 +17,28 @@ en: {
   twoBHK: "2 BHK",
   
   // Room Count
-  availableRooms: "Available Rooms on Nivasi.space",
+  availableRooms: "Available Rooms on nivasispace.com",
   forBoys: "for Boys",
   forGirls: "for Girls",
   roomsAvailable: "room available for rent",
   roomsAvailablePlural: "rooms available for rent",
-  poweredBy: "Powered by Nivasi.space - Your trusted college room rental platform",
+  poweredBy: "Powered by nivasispace.com - Your trusted college room rental platform",
   
   // Empty States
-  welcomeToNivase: "Welcome to Nivasi.space",
+  welcomeToNivase: "Welcome to nivasispace.com",
   collegeRoomRental: "College Room Rental - Please select your gender to see available rooms",
   selectGender: "Select Gender",
   noRoomsForGender: "No rooms available for",
   beFirstToAdd: "Be the first to add a room listing for",
-  onNivase: "on Nivasi.space!",
+  onNivase: "on nivasispace.com!",
   addFirstRoom: "Add First Room",
   noRoomsAvailable: "No rooms available",
   beFirstToAddGeneral: "Be the first to add a room listing!",
   
   // Footer
-  copyright: "Nivasi.space. All rights reserved.",
+  copyright: "nivasispace.com. All rights reserved.",
+
+  
   contact: "Contact:",
   privacyPolicy: "Privacy Policy",
   termsOfService: "Terms of Service",
@@ -45,7 +47,7 @@ en: {
   loadingRooms: "Loading rooms...",
   
   // Gender Selection Modal
-  welcomeToCollegeRoomRental: "Welcome to Nivasi.space",
+  welcomeToCollegeRoomRental: "Welcome to nivasispace.com",
   selectGenderToSeeRooms: "College Room Rental - Please select your gender to see available rooms",
   selectYourGender: "Please select your gender to see available rooms",
   boys: "Boys",
@@ -73,8 +75,8 @@ en: {
   update: "Update",
   
   // Room Detail Modal
-  checkOutRoom: "Check out this room on Nivasi.space:",
-  foundOnNivasi: "Found on Nivasi.space",
+  checkOutRoom: "Check out this room on nivasispace.com:",
+  foundOnNivasi: "Found on nivasispace.com",
     callNow: "Call Now",
   whatsapp: "WhatsApp",
   viewOnGoogleMaps: "View on Google Maps",
@@ -217,7 +219,7 @@ en: {
   termsConditions: "Terms & Conditions",
   refundPolicy: "Refund Policy",
   safetyGuidelines: "Safety Guidelines",
-  allRightsReserved: "© 2025 Nivasi.space. All rights reserved.",
+  allRightsReserved: "© 2025 nivasispace.com. All rights reserved.",
   designDevelopedBy: "Design & Develop by:",
   akashSolutions: "Akash.Solutions",
   trustedPlatform: "India's trusted college room rental platform connecting students with perfect accommodations since 2025. We blend technology with student needs to help you find your ideal room near campus.",
@@ -291,8 +293,8 @@ en: {
     enterPassword: "Enter your password",
   enterFirstName: "First name",
   enterLastName: "Last name",
-  signInDescription: "Welcome back to Nivasi.space",
-  signUpDescription: "Join Nivasi.space today",
+  signInDescription: "Welcome back to nivasispace.com",
+  signUpDescription: "Join nivasispace.com today",
   dontHaveAccount: "Don't have an account?",
   alreadyHaveAccount: "Already have an account?",
   signingIn: "Signing in...",
@@ -378,7 +380,7 @@ en: {
   
   hi: {
   // Header
-    title: "Nivasi.space",
+    title: "nivasispace.com",
     tagline: "कॉलेज रूम रेंटल - अपना सही कमरा कैंपस के पास खोजें",
     changeGender: "स्थान या लिंग बदलें",
     addRoom: "कमरा जोड़ें",
@@ -394,26 +396,26 @@ en: {
     twoBHK: "दो बीएचके",
   
   // Room Count
-    availableRooms: "Nivasi.space पर उपलब्ध कमरे",
+    availableRooms: "nivasispace.com पर उपलब्ध कमरे",
     forBoys: "लड़कों के लिए",
     forGirls: "लड़कियों के लिए",
     roomsAvailable: "कमरा किराए के लिए उपलब्ध",
     roomsAvailablePlural: "कमरे किराए के लिए उपलब्ध",
-    poweredBy: "Nivasi.space द्वारा संचालित - आपका विश्वसनीय कॉलेज रूम रेंटल प्लेटफॉर्म",
+    poweredBy: "nivasispace.com द्वारा संचालित - आपका विश्वसनीय कॉलेज रूम रेंटल प्लेटफॉर्म",
   
   // Empty States
-    welcomeToNivase: "Nivasi.space में आपका स्वागत है",
+    welcomeToNivase: "nivasispace.com में आपका स्वागत है",
     collegeRoomRental: "कॉलेज रूम रेंटल - कृपया उपलब्ध कमरे देखने के लिए अपना लिंग चुनें",
     selectGender: "लिंग चुनें",
     noRoomsForGender: "के लिए कोई कमरा उपलब्ध नहीं",
     beFirstToAdd: "के लिए पहला कमरा जोड़ने वाले बनें",
-    onNivase: "Nivasi.space पर!",
+    onNivase: "nivasispace.com पर!",
     addFirstRoom: "पहला कमरा जोड़ें",
     noRoomsAvailable: "कोई कमरा उपलब्ध नहीं",
     beFirstToAddGeneral: "पहला कमरा लिस्टिंग जोड़ने वाले बनें!",
   
   // Footer
-    copyright: "Nivasi.space. सर्वाधिकार सुरक्षित।",
+    copyright: "nivasispace.com. सर्वाधिकार सुरक्षित।",
     contact: "संपर्क:",
     privacyPolicy: "गोपनीयता नीति",
     termsOfService: "सेवा की शर्तें",
@@ -422,7 +424,7 @@ en: {
     loadingRooms: "कमरे लोड हो रहे हैं...",
   
   // Gender Selection Modal
-    welcomeToCollegeRoomRental: "Nivasi.space में आपका स्वागत है",
+    welcomeToCollegeRoomRental: "nivasispace.com में आपका स्वागत है",
     selectGenderToSeeRooms: "कॉलेज रूम रेंटल - कृपया उपलब्ध कमरे देखने के लिए अपना लिंग चुनें",
     selectYourGender: "कृपया उपलब्ध कमरे देखने के लिए अपना लिंग चुनें",
     boys: "लड़के",
@@ -450,8 +452,8 @@ en: {
     update: "अपडेट करें",
   
   // Room Detail Modal
-    checkOutRoom: "Nivasi.space पर इस कमरे को देखें:",
-    foundOnNivasi: "Nivasi.space पर मिला",
+    checkOutRoom: "nivasispace.com पर इस कमरे को देखें:",
+    foundOnNivasi: "nivasispace.com पर मिला",
     callNow: "अभी कॉल करें",
     whatsapp: "व्हाट्सऐप",
     viewOnGoogleMaps: "Google Maps पर देखें",
@@ -641,7 +643,7 @@ en: {
     termsConditions: "नियम और शर्तें",
     refundPolicy: "धनवापसी नीति",
     safetyGuidelines: "सुरक्षा दिशानिर्देश",
-    allRightsReserved: "© 2025 Nivasi.space. सर्वाधिकार सुरक्षित।",
+    allRightsReserved: "© 2025 nivasispace.com. सर्वाधिकार सुरक्षित।",
     designDevelopedBy: "डिज़ाइन और विकास:",
     akashSolutions: "आकाश.सॉल्यूशंस",
     trustedPlatform: "भारत का विश्वसनीय कॉलेज रूम रेंटल प्लेटफॉर्म जो 2025 से छात्रों को सही आवास के साथ जोड़ रहा है। हम तकनीक को छात्रों की जरूरतों के साथ मिलाते हैं ताकि आपको कैंपस के पास अपना आदर्श कमरा मिल सके।",
@@ -650,7 +652,7 @@ en: {
   
   mr: {
   // Header
-    title: "Nivasi.space",
+    title: "nivasispace.com",
     tagline: "कॉलेज रूम रेंटल - तुमचा योग्य खोली कॅम्पसाजवळ शोधा",
     changeGender: "स्थान किंवा लिंग बदला",
     addRoom: "खोली जोडा",
@@ -666,26 +668,26 @@ en: {
     twoBHK: "दोन बीएचके",
   
   // Room Count
-    availableRooms: "Nivasi.space वर उपलब्ध खोल्या",
+    availableRooms: "nivasispace.com वर उपलब्ध खोल्या",
     forBoys: "मुलांसाठी",
     forGirls: "मुलींसाठी",
     roomsAvailable: "खोली भाड्याने उपलब्ध",
     roomsAvailablePlural: "खोल्या भाड्याने उपलब्ध",
-    poweredBy: "Nivasi.space द्वारे संचालित - तुमचे विश्वसनीय कॉलेज रूम रेंटल प्लॅटफॉर्म",
+    poweredBy: "nivasispace.com द्वारे संचालित - तुमचे विश्वसनीय कॉलेज रूम रेंटल प्लॅटफॉर्म",
   
   // Empty States
-    welcomeToNivase: "Nivasi.space मध्ये तुमचे स्वागत आहे",
+    welcomeToNivase: "nivasispace.com मध्ये तुमचे स्वागत आहे",
     collegeRoomRental: "कॉलेज रूम रेंटल - कृपया उपलब्ध खोल्या पाहण्यासाठी तुमचे लिंग निवडा",
     selectGender: "लिंग निवडा",
     noRoomsForGender: "साठी कोणतीही खोली उपलब्ध नाही",
     beFirstToAdd: "साठी पहिली खोली जोडणारे व्हा",
-    onNivase: "Nivasi.space वर!",
+    onNivase: "nivasispace.com वर!",
     addFirstRoom: "पहिली खोली जोडा",
     noRoomsAvailable: "कोणतीही खोली उपलब्ध नाही",
     beFirstToAddGeneral: "पहिली खोली लिस्टिंग जोडणारे व्हा!",
   
   // Footer
-    copyright: "Nivasi.space. सर्व हक्क राखीव.",
+    copyright: "nivasispace.com. सर्व हक्क राखीव.",
     contact: "संपर्क:",
     privacyPolicy: "गोपनीयता धोरण",
     termsOfService: "सेवेच्या अटी",
@@ -694,7 +696,7 @@ en: {
     loadingRooms: "खोल्या लोड होत आहेत...",
   
   // Gender Selection Modal
-    welcomeToCollegeRoomRental: "Nivasi.space मध्ये तुमचे स्वागत आहे",
+    welcomeToCollegeRoomRental: "nivasispace.com मध्ये तुमचे स्वागत आहे",
     selectGenderToSeeRooms: "कॉलेज रूम रेंटल - कृपया उपलब्ध खोल्या पाहण्यासाठी तुमचे लिंग निवडा",
     selectYourGender: "कृपया उपलब्ध खोल्या पाहण्यासाठी तुमचे लिंग निवडा",
     boys: "मुले",
@@ -722,8 +724,8 @@ en: {
     update: "अपडेट करा",
   
   // Room Detail Modal
-    checkOutRoom: "Nivasi.space वर ही खोली पहा:",
-    foundOnNivasi: "Nivasi.space वर सापडले",
+    checkOutRoom: "nivasispace.com वर ही खोली पहा:",
+    foundOnNivasi: "nivasispace.com वर सापडले",
     callNow: "आता कॉल करा",
     whatsapp: "व्हॉट्सअॅप",
     viewOnGoogleMaps: "Google Maps वर पहा",
@@ -822,7 +824,7 @@ en: {
     termsConditions: "नियम आणि अटी",
     refundPolicy: "परतावा धोरण",
     safetyGuidelines: "सुरक्षा मार्गदर्शक तत्त्वे",
-    allRightsReserved: "© 2025 Nivasi.space. सर्व हक्क राखीव.",
+    allRightsReserved: "© 2025 nivasispace.com. सर्व हक्क राखीव.",
     designDevelopedBy: "डिझाइन आणि विकास:",
     akashSolutions: "आकाश.सोल्युशन्स",
     trustedPlatform: "भारताचे विश्वसनीय कॉलेज रूम रेंटल प्लॅटफॉर्म जे 2025 पासून विद्यार्थ्यांना परिपूर्ण आवासासह जोडत आहे. आम्ही तंत्रज्ञानाला विद्यार्थ्यांच्या गरजांसह मिसळतो जेणेकरून तुम्हाला कॅम्पसाजवळ तुमची आदर्श खोली मिळू शकेल.",
@@ -842,8 +844,8 @@ en: {
     enterPassword: "तुमचा पासवर्ड प्रविष्ट करा",
     enterFirstName: "पहिले नाव",
     enterLastName: "आडनाव",
-    signInDescription: "Nivasi.space मध्ये परत स्वागत आहे",
-    signUpDescription: "आजच Nivasi.space मध्ये सामील व्हा",
+    signInDescription: "nivasispace.com मध्ये परत स्वागत आहे",
+    signUpDescription: "आजच nivasispace.com मध्ये सामील व्हा",
     dontHaveAccount: "खाते नाही?",
     alreadyHaveAccount: "आधीपासूनच खाते आहे?",
     signingIn: "साइन इन होत आहे...",

@@ -62,7 +62,7 @@ ${booking.message}
 🕒 *Submitted:* ${new Date(booking.createdAt).toLocaleString()}
 
 ---
-*This booking was submitted through Nivasi.space*`;
+*This booking was submitted through nivasispace.com*`;
 
   return message;
 };

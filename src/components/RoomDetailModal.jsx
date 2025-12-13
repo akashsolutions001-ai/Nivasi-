@@ -195,7 +195,7 @@ const RoomDetailModal = ({ room, onClose }) => {
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <img src="/logo.svg" alt="Nivasi.space Logo" className="w-14 h-14 object-contain" />
+                      <img src="/logo.svg" alt="nivasispace.com Logo" className="w-14 h-14 object-contain" />
                     </div>
                     <p className="text-gray-500">{t('noImageAvailable')}</p>
                   </div>

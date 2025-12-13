@@ -1,7 +1,7 @@
 {
-  "name": "Nivasi.space - College Room Rental Platform",
+  "name": "nivasispace.com - College Room Rental Platform",
   "short_name": "Nivasi",
-  "description": "Find the perfect college room for rent on Nivasi.space. Browse listings, view features and conditions, and contact owners directly. Nivasi college room rental, student accommodation, hostel, PG, shared accommodation.",
+  "description": "Find the perfect college room for rent on nivasispace.com. Browse listings, view features and conditions, and contact owners directly. Nivasi college room rental, student accommodation, hostel, PG, shared accommodation.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

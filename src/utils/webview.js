@@ -84,12 +84,12 @@ export const getAuthErrorMessage = (error) => {
   if (error.message?.includes('disallowed_useragent') || 
       error.message?.includes('Use secure browsers')) {
     if (detection.isWebView) {
-      return 'Google Sign-In requires a secure browser. Please open this link in your default browser or install the Nivasi Space app for the best experience.';
+      return 'Google Sign-In requires a secure browser. Please open this link in your default browser or install the nivasispace.com app for the best experience.';
     }
     if (isIOS) {
-      return 'Google Sign-In requires a secure browser on iOS. Please try opening this link in Safari or install the Nivasi Space app.';
+      return 'Google Sign-In requires a secure browser on iOS. Please try opening this link in Safari or install the nivasispace.com app.';
     }
-    return 'Google Sign-In requires a secure browser. Please try using a different browser or install the Nivasi Space app.';
+    return 'Google Sign-In requires a secure browser. Please try using a different browser or install the nivasispace.com app.';
   }
   
   if (error.code === 'auth/popup-blocked') {
@@ -135,22 +135,22 @@ export const getAuthSolutionSuggestions = (error) => {
       error.message?.includes('Use secure browsers')) {
     if (isIOS) {
       suggestions.push('Open this link in Safari for better compatibility');
-      suggestions.push('Install the Nivasi Space app for the best experience');
+      suggestions.push('Install the nivasispace.com app for the best experience');
       suggestions.push('Try refreshing the page and signing in again');
     } else if (detection.isWebView) {
       suggestions.push('Open this link in your default browser');
-      suggestions.push('Install the Nivasi Space app for the best experience');
+      suggestions.push('Install the nivasispace.com app for the best experience');
       suggestions.push('Try using Chrome, Firefox, or Safari');
     } else {
       suggestions.push('Try using a different browser');
-      suggestions.push('Install the Nivasi Space app');
+      suggestions.push('Install the nivasispace.com app');
     }
   }
   
   if (error.code === 'auth/popup-blocked') {
     if (isIOS) {
       suggestions.push('iOS automatically redirects to Safari for secure authentication');
-      suggestions.push('Install the Nivasi Space app for seamless experience');
+      suggestions.push('Install the nivasispace.com app for seamless experience');
       suggestions.push('Try refreshing the page if redirect doesn\'t work');
     } else {
       suggestions.push('Allow popups for this website');
@@ -175,7 +175,7 @@ export const getAuthSolutionSuggestions = (error) => {
       suggestions.push('Authentication is taking longer than expected on iOS');
       suggestions.push('Try refreshing the page');
       suggestions.push('Open in Safari for faster authentication');
-      suggestions.push('Install the Nivasi Space app for better performance');
+      suggestions.push('Install the nivasispace.com app for better performance');
     } else {
       suggestions.push('Authentication is taking longer than expected');
       suggestions.push('Try refreshing the page');
@@ -185,13 +185,13 @@ export const getAuthSolutionSuggestions = (error) => {
   
   if (detection.isWebView && suggestions.length === 0) {
     suggestions.push('Open in your default browser for better compatibility');
-    suggestions.push('Install the Nivasi Space app');
+    suggestions.push('Install the nivasispace.com app');
   }
   
   // Add iOS-specific general suggestions if no specific suggestions found
   if (isIOS && suggestions.length === 0) {
     suggestions.push('Open in Safari for the best iOS compatibility');
-    suggestions.push('Install the Nivasi Space app for seamless experience');
+    suggestions.push('Install the nivasispace.com app for seamless experience');
     suggestions.push('Try refreshing the page if issues persist');
   }
   
