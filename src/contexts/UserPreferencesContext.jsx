@@ -25,7 +25,18 @@ export const UserPreferencesProvider = ({ children }) => {
         return localStorage.getItem('hasAcceptedTerms') === 'true';
     });
 
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(() => {
+        return sessionStorage.getItem('isAdmin') === 'true';
+    });
+
+    useEffect(() => {
+        if (isAdmin) {
+            console.log('[admin] admin session active: preserving admin mode');
+            sessionStorage.setItem('isAdmin', 'true');
+        } else {
+            sessionStorage.removeItem('isAdmin');
+        }
+    }, [isAdmin]);
 
     // Persist changes to localStorage
     useEffect(() => {

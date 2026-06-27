@@ -31,6 +31,11 @@ const RoomDetailModal = ({ room, onClose }) => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Carousel State
+  const [isPaused, setIsPaused] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [touchEndX, setTouchEndX] = useState(0);
 
   // Prevent background scrolling when modal is open
   useEffect(() => {
@@ -39,6 +44,26 @@ const RoomDetailModal = ({ room, onClose }) => {
       document.body.style.overflow = 'unset';
     };
   }, []);
+
+  // Auto-slide effect
+  useEffect(() => {
+    if (!room.images || room.images.length <= 1 || isPaused) return;
+
+    const intervalId = setInterval(() => {
+      setCurrentImageIndex((prev) =>
+        prev === room.images.length - 1 ? 0 : prev + 1
+      );
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [room.images, isPaused]);
+
+  // Resume auto-slide when fullscreen mode is closed
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsPaused(false);
+    }
+  }, [isFullscreen]);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) =>
@@ -50,6 +75,33 @@ const RoomDetailModal = ({ room, onClose }) => {
     setCurrentImageIndex((prev) =>
       prev === room.images.length - 1 ? 0 : prev + 1
     );
+  };
+
+  const handleTouchStart = (e) => {
+    setIsPaused(true);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    setIsPaused(false);
+    if (!touchStartX || !touchEndX) return;
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe) {
+      handleNextImage();
+    }
+    if (isRightSwipe) {
+      handlePrevImage();
+    }
+    
+    setTouchStartX(0);
+    setTouchEndX(0);
   };
 
   const handleCall = () => {
@@ -154,14 +206,22 @@ const RoomDetailModal = ({ room, onClose }) => {
 
                 {/* Main Image */}
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm w-full">
+                  <div 
+                    className="relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm w-full"
+                    onMouseEnter={() => setIsPaused(true)}
+                    onMouseLeave={() => setIsPaused(false)}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
                     {room.images && room.images.length > 0 ? (
                       <>
                         <img
                           src={room.images[currentImageIndex]}
                           alt={`${room.title} - Image ${currentImageIndex + 1}`}
-                          className="w-full h-auto max-h-[35vh] sm:max-h-[45vh] lg:max-h-[60vh] object-contain cursor-zoom-in mx-auto block"
-                          onClick={() => setIsFullscreen(true)}
+                          className="w-full h-auto max-h-[35vh] sm:max-h-[45vh] lg:max-h-[60vh] object-contain cursor-zoom-in mx-auto block select-none"
+                          onClick={() => { setIsPaused(true); setIsFullscreen(true); }}
+                          onError={(e) => { e.target.src = 'https://placehold.co/600x400?text=Image+Not+Available'; e.target.onerror = null; }}
                         />
 
                         {/* Navigation Arrows */}
@@ -191,8 +251,22 @@ const RoomDetailModal = ({ room, onClose }) => {
                           <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
                         </button>
 
+                        {/* Dot Indicators */}
+                        {room.images.length > 1 && (
+                          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/30 px-2 py-1.5 rounded-full pointer-events-none">
+                            {room.images.map((_, idx) => (
+                              <div
+                                key={idx}
+                                className={`h-1.5 rounded-full transition-all ${
+                                  idx === currentImageIndex ? 'bg-white w-4' : 'bg-white/50 w-1.5'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        )}
+
                         {/* Image Counter */}
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
                           {currentImageIndex + 1} / {room.images.length}
                         </div>
                       </>

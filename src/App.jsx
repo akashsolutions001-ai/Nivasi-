@@ -604,6 +604,7 @@ function App() {
       const { updateRoom } = await import('./services/roomService.js');
       const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? savedRoom : r)));
+      console.log('[admin] action completed: room updated');
       setEditRoom(null);
       setNotification({
         message: 'Your room listing has been updated with the new details.',
@@ -630,6 +631,7 @@ function App() {
       const { verifyRoom } = await import('./services/roomService.js');
       await verifyRoom(roomToVerify.id, user?.uid || 'admin');
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToVerify.id ? { ...r, verificationStatus: 'verified' } : r)));
+      console.log('[admin] action completed: room verified');
       setNotification({
         message: 'The room has been verified successfully.',
         type: 'success',
@@ -682,6 +684,7 @@ function App() {
         // If somehow a room has no ID, don't delete it
         return true;
       }));
+      console.log('[admin] action completed: room deleted');
       setNotification({
         message: 'The room has been removed from the listings.',
         type: 'success',
@@ -710,7 +713,7 @@ function App() {
       await updateRoom(room.id, updatedRoom);
 
       setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
-
+      console.log('[admin] action completed: room visibility toggled');
       setNotification({
         message: room.hidden
           ? 'Room is now visible to all users.'
