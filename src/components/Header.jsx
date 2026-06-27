@@ -42,10 +42,11 @@ const Header = ({
                             onClick={() => navigate('/profile')}
                             variant="ghost"
                             size="sm"
-                            className="relative z-50 p-0 h-9 w-9 min-h-0 text-white hover:bg-white/20 rounded-full flex-shrink-0 flex items-center justify-center"
+                            className="relative z-50 px-2 h-9 min-h-0 text-white hover:bg-white/20 rounded-lg flex-shrink-0 flex items-center justify-center gap-1.5"
                             style={{ minHeight: 'unset' }}
                         >
                             <User className="w-5 h-5" />
+                            <span className="text-xs font-medium">Profile</span>
                         </Button>
                     </div>
 
