@@ -17,13 +17,23 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
     return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const handleCallClick = useCallback(() => {
-    window.location.href = `tel:${room.contact}`;
+  const handleCallClick = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (room.contact) window.location.href = `tel:${room.contact}`;
   }, [room.contact]);
 
-  const handleMapClick = useCallback(() => {
-    window.open(room.mapLink, '_blank');
-  }, [room.mapLink]);
+  const handleMapClick = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const url = room.mapLink
+      || (room.location
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(room.location)}`
+          : room.address
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(room.address)}`
+          : null);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }, [room.mapLink, room.location, room.address]);
 
   const handleImageClick = useCallback((idx) => {
     setModalImageIdx(idx);

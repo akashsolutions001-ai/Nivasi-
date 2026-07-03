@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { User, Phone, Mail, Building, Save, Loader2, CheckCircle, Users, LogOut, MapPin, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
@@ -9,6 +9,22 @@ import { db } from '../firebase.js';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import RoomCard from '../components/RoomCard.jsx';
+import ConfirmationModal from '../components/ConfirmationModal.jsx';
+import InAppToast from '../components/InAppToast.jsx';
+import { initiatePayment } from '../services/paymentService.js';
+
+const RoomDetailModal = lazy(() => import('../components/RoomDetailModal.jsx'));
+const AddRoomModal = lazy(() => import('../components/AddRoomModal.jsx'));
+const BookingModal = lazy(() => import('../components/BookingModal.jsx'));
+
+const ModalLoadingSpinner = () => (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-8 flex items-center gap-3">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
+      <span className="text-gray-600">Loading...</span>
+    </div>
+  </div>
+);
 
 // List of colleges
 const COLLEGES = [
@@ -49,6 +65,15 @@ const ProfilePage = () => {
     const [myRooms, setMyRooms] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Room action state
+    const [selectedRoom, setSelectedRoom] = useState(null);
+    const [showBookingModal, setShowBookingModal] = useState(false);
+    const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
+    const [editRoom, setEditRoom] = useState(null);
+    const [roomToDelete, setRoomToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false, title: '' });
 
     const [formData, setFormData] = useState({
         displayName: '',
@@ -137,6 +162,129 @@ const ProfilePage = () => {
         setSaveSuccess(false);
     };
 
+    // ── Room action handlers ──────────────────────────────────────────────
+
+    const handleViewDetails = useCallback((room) => {
+        setSelectedRoom(room);
+    }, []);
+
+    const handleBookNow = useCallback((room) => {
+        setSelectedRoomForBooking(room);
+        setShowBookingModal(true);
+    }, []);
+
+    const handleBookingSuccess = useCallback(() => {
+        setShowBookingModal(false);
+        setSelectedRoomForBooking(null);
+        setNotification({
+            message: 'Your booking request has been submitted. The owner will contact you soon.',
+            type: 'success',
+            isVisible: true,
+            title: 'Booking Submitted!'
+        });
+    }, []);
+
+    const handleEditRoom = useCallback((room) => {
+        setEditRoom(room);
+    }, []);
+
+    const handleUpdateRoom = useCallback(async (updatedRoom) => {
+        try {
+            const { updateRoom } = await import('../services/roomService.js');
+            const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
+            setMyRooms(prev => prev.map(r => r.id === savedRoom.id ? savedRoom : r));
+            setEditRoom(null);
+            setNotification({
+                message: 'Your room listing has been updated.',
+                type: 'success',
+                isVisible: true,
+                title: 'Room Updated!'
+            });
+        } catch (error) {
+            console.error('Error updating room:', error);
+            setMyRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r));
+            setEditRoom(null);
+            setNotification({
+                message: 'Changes saved locally. Will sync when connection is restored.',
+                type: 'warning',
+                isVisible: true,
+                title: 'Updated Locally'
+            });
+        }
+    }, []);
+
+    const handleRequestDelete = useCallback((room) => {
+        setRoomToDelete(room);
+    }, []);
+
+    const handleConfirmDelete = useCallback(async () => {
+        if (!roomToDelete || isDeleting) return;
+        setIsDeleting(true);
+        try {
+            const { deleteRoom } = await import('../services/roomService.js');
+            if (roomToDelete.id) await deleteRoom(roomToDelete.id);
+        } catch (error) {
+            console.error('Error deleting room:', error);
+        } finally {
+            setMyRooms(prev => prev.filter(r => r.id !== roomToDelete.id));
+            setIsDeleting(false);
+            setRoomToDelete(null);
+            setNotification({
+                message: 'Your room has been removed from listings.',
+                type: 'success',
+                isVisible: true,
+                title: 'Room Deleted!'
+            });
+        }
+    }, [roomToDelete, isDeleting]);
+
+    const handleToggleHidden = useCallback(async (room) => {
+        try {
+            const { updateRoom } = await import('../services/roomService.js');
+            const updatedRoom = { ...room, hidden: !room.hidden };
+            await updateRoom(room.id, updatedRoom);
+            setMyRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
+            setNotification({
+                message: room.hidden ? 'Room is now visible.' : 'Room is now hidden.',
+                type: 'success',
+                isVisible: true,
+                title: room.hidden ? 'Room Unhidden!' : 'Room Hidden!'
+            });
+        } catch (error) {
+            console.error('Error toggling room visibility:', error);
+            setMyRooms(prev => prev.map(r => r.id === room.id ? { ...r, hidden: !r.hidden } : r));
+        }
+    }, []);
+
+    const handleRenew = useCallback(async (room) => {
+        try {
+            setNotification({
+                message: 'Redirecting to payment for subscription renewal...',
+                type: 'info',
+                isVisible: true,
+                title: 'Redirecting to Payment'
+            });
+            await initiatePayment({
+                roomId: room.id,
+                roomType: room.roomType || room.rooms || '1 RK',
+                customerName: user?.displayName || 'Nivasi Host',
+                customerEmail: user?.email || 'payments@nivasi.space',
+                customerPhone: room.contact || '9999999999'
+            });
+        } catch (error) {
+            console.error('Error initiating payment:', error);
+            const isDuplicate = error.message && error.message.includes('already active');
+            setNotification({
+                message: isDuplicate ? 'Your subscription is already active.' : 'Failed to initiate payment: ' + error.message,
+                type: isDuplicate ? 'info' : 'error',
+                isVisible: true,
+                title: isDuplicate ? 'Subscription Active' : 'Payment Error'
+            });
+        }
+    }, [user]);
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     const handleLogout = async () => {
         try {
             const { signOut } = await import('../firebase.js');
@@ -211,6 +359,14 @@ const ProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+            <InAppToast
+                message={notification.message}
+                type={notification.type}
+                isVisible={notification.isVisible}
+                title={notification.title}
+                onClose={() => setNotification(prev => ({ ...prev, isVisible: false }))}
+                duration={4000}
+            />
             <div className="max-w-3xl mx-auto">
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
                     {/* Header Banner */}
@@ -423,9 +579,12 @@ const ProfilePage = () => {
                                         key={room.id}
                                         room={room}
                                         isOwner={true}
-                                        onViewDetails={() => {/* Provide dummy or implement view */}}
-                                        // Let them go back to Home for editing/deleting for now, or just show the status
-                                        // Edit/Delete handlers can be added similarly to App.jsx if needed
+                                        onViewDetails={(r) => handleViewDetails(r)}
+                                        onBookNow={(r) => handleBookNow(r)}
+                                        onEdit={(r) => handleEditRoom(r)}
+                                        onDelete={() => handleRequestDelete(room)}
+                                        onToggleHidden={() => handleToggleHidden(room)}
+                                        onRenew={(r) => handleRenew(r || room)}
                                     />
                                 ))}
                             </div>
@@ -436,6 +595,52 @@ const ProfilePage = () => {
                         )}
                     </div>
                 )}
+
+                {/* ── My Rooms Modals ─────────────────────────────── */}
+                {selectedRoom && (
+                    <Suspense fallback={<ModalLoadingSpinner />}>
+                        <RoomDetailModal
+                            room={selectedRoom}
+                            onClose={() => setSelectedRoom(null)}
+                        />
+                    </Suspense>
+                )}
+
+                {showBookingModal && selectedRoomForBooking && (
+                    <Suspense fallback={<ModalLoadingSpinner />}>
+                        <BookingModal
+                            room={selectedRoomForBooking}
+                            onClose={() => { setShowBookingModal(false); setSelectedRoomForBooking(null); }}
+                            onSuccess={handleBookingSuccess}
+                        />
+                    </Suspense>
+                )}
+
+                {editRoom && (
+                    <Suspense fallback={<ModalLoadingSpinner />}>
+                        <AddRoomModal
+                            room={editRoom}
+                            onClose={() => setEditRoom(null)}
+                            onAddRoom={handleUpdateRoom}
+                            isAdmin={false}
+                        />
+                    </Suspense>
+                )}
+
+                {roomToDelete && (
+                    <ConfirmationModal
+                        isOpen={!!roomToDelete}
+                        title="Delete Room"
+                        message={`Are you sure you want to delete "${roomToDelete.title}"? This action cannot be undone.`}
+                        confirmText="Delete"
+                        onConfirm={handleConfirmDelete}
+                        onClose={() => setRoomToDelete(null)}
+                        type="danger"
+                        isLoading={isDeleting}
+                    />
+                )}
+
+                {/* ────────────────────────────────────────────────── */}
 
                 {/* Admin Login Button */}
                 <div className="mt-8 flex justify-center">
