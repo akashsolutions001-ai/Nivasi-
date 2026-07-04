@@ -1,8 +1,32 @@
 // Room Service - Firestore operations for rooms
 import { db, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, serverTimestamp } from '../firebase.js';
-import { getSubscriptionAmount, isSubscriptionActive } from '../utils/subscriptionConfig.js';
+import { getSubscriptionAmount, isSubscriptionActive, SUBSCRIPTION_DURATION_DAYS } from '../utils/subscriptionConfig.js';
 
 const ROOMS_COLLECTION = 'rooms';
+
+/** Fields that must not be changed via a normal room edit */
+const PROTECTED_UPDATE_FIELDS = [
+    'verificationStatus',
+    'verifiedAt',
+    'verifiedBy',
+    'rejectedAt',
+    'rejectedBy',
+    'ownerId',
+    'ownerName',
+    'ownerEmail',
+    'ownerPhone',
+    'createdAt',
+    'paymentStatus',
+    'subscriptionStatus',
+    'subscriptionStart',
+    'subscriptionEnd',
+    'subscriptionAmount',
+    'paymentOrderId',
+    'paymentMethod',
+    'isPublished',
+    'roomStatus',
+    'visibility'
+];
 
 /**
  * Remove keys with undefined so Firestore gets only defined values
@@ -86,10 +110,11 @@ export const addRoom = async (roomData, user, isAdmin) => {
         const roomToAdd = omitUndefined({
             ...roomData,
             ...subscriptionFields,
-            ownerId: user?.uid || null,
-            ownerName: user?.displayName || null,
-            ownerEmail: user?.email || null,
+            ownerId: isAdmin ? null : (user?.uid || null),
+            ownerName: isAdmin ? null : (user?.displayName || null),
+            ownerEmail: isAdmin ? null : (user?.email || null),
             ownerPhone: roomData.contact || null,
+            addedByAdmin: isAdmin || undefined,
             verificationStatus: isAdmin ? 'verified' : 'pending',
             roomStatus: 'active',
             visibility: 'visible',
@@ -108,10 +133,11 @@ export const addRoom = async (roomData, user, isAdmin) => {
         return {
             ...roomData,
             ...subscriptionFields,
-            ownerId: user?.uid || null,
-            ownerName: user?.displayName || null,
-            ownerEmail: user?.email || null,
+            ownerId: isAdmin ? null : (user?.uid || null),
+            ownerName: isAdmin ? null : (user?.displayName || null),
+            ownerEmail: isAdmin ? null : (user?.email || null),
             ownerPhone: roomData.contact || null,
+            addedByAdmin: isAdmin || undefined,
             verificationStatus: isAdmin ? 'verified' : 'pending',
             roomStatus: 'active',
             visibility: 'visible',
@@ -119,6 +145,59 @@ export const addRoom = async (roomData, user, isAdmin) => {
         };
     } catch (error) {
         console.error('Error adding room to Firestore:', error);
+        throw error;
+    }
+};
+
+/**
+ * Activate subscription after cash payment collected by admin
+ */
+export const activateCashSubscription = async (roomId) => {
+    try {
+        const now = new Date();
+        const subscriptionEnd = new Date(now.getTime() + SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000);
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+
+        const updatePayload = {
+            paymentStatus: 'paid',
+            subscriptionStatus: 'active',
+            subscriptionStart: now,
+            subscriptionEnd,
+            paymentMethod: 'cash',
+            paymentOrderId: `cash-${roomId}-${Date.now()}`,
+            isPublished: true,
+            updatedAt: serverTimestamp()
+        };
+
+        await updateDoc(roomRef, updatePayload);
+
+        return {
+            ...updatePayload,
+            id: roomId
+        };
+    } catch (error) {
+        console.error('Error activating cash subscription:', error);
+        throw error;
+    }
+};
+
+/**
+ * Clear personal ownership on platform listings (admin-added rooms).
+ * Used for new admin adds and one-time legacy cleanup.
+ */
+export const releasePlatformRoomOwnership = async (roomId) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            ownerId: null,
+            ownerName: null,
+            ownerEmail: null,
+            addedByAdmin: true,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error releasing platform room ownership:', error);
         throw error;
     }
 };
@@ -211,11 +290,16 @@ export const updateRoom = async (roomId, roomData) => {
         // Remove id from the data (it's in the document path)
         delete roomToUpdate.id;
 
+        // Never allow edits to change verification, subscription, or ownership
+        for (const field of PROTECTED_UPDATE_FIELDS) {
+            delete roomToUpdate[field];
+        }
+
         await updateDoc(roomRef, roomToUpdate);
 
         return {
             id: roomId,
-            ...roomData
+            ...roomToUpdate
         };
     } catch (error) {
         console.error('Error updating room in Firestore:', error);

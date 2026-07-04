@@ -9,7 +9,10 @@ import {
   Check,
   AlertCircle,
   Trash2,
-  Locate
+  Locate,
+  CreditCard,
+  Banknote,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
@@ -72,7 +75,7 @@ const CONDITION_OPTIONS = [
   { key: 'entryGateLocked', label: 'Entry gate locked after hours' }
 ];
 
-const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
+const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCollectCash }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState(() => initialRoom ? {
     title: initialRoom.title || '',
@@ -125,6 +128,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
   const [mapLinkError, setMapLinkError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingRoomData, setPendingRoomData] = useState(null);
+  const [step, setStep] = useState('form');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -320,12 +324,59 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
       selectedConditions: formData.selectedConditions,
       hidden: isEdit && initialRoom ? (initialRoom.hidden || false) : false,
       ...(adv != null && !isNaN(adv) ? { advance: adv } : {}),
-      ...(dep != null && !isNaN(dep) ? { deposit: dep } : {})
+      ...(dep != null && !isNaN(dep) ? { deposit: dep } : {}),
+      ...(isEdit && initialRoom ? {
+        verificationStatus: initialRoom.verificationStatus,
+        verifiedAt: initialRoom.verifiedAt,
+        verifiedBy: initialRoom.verifiedBy,
+        rejectedAt: initialRoom.rejectedAt,
+        rejectedBy: initialRoom.rejectedBy,
+        ownerId: initialRoom.ownerId,
+        ownerName: initialRoom.ownerName,
+        ownerEmail: initialRoom.ownerEmail,
+        ownerPhone: initialRoom.ownerPhone,
+        paymentStatus: initialRoom.paymentStatus,
+        subscriptionStatus: initialRoom.subscriptionStatus,
+        subscriptionStart: initialRoom.subscriptionStart,
+        subscriptionEnd: initialRoom.subscriptionEnd,
+        subscriptionAmount: initialRoom.subscriptionAmount,
+        paymentOrderId: initialRoom.paymentOrderId,
+        paymentMethod: initialRoom.paymentMethod,
+        isPublished: initialRoom.isPublished,
+        roomStatus: initialRoom.roomStatus,
+        visibility: initialRoom.visibility
+      } : {})
     };
 
-    // Store room data and show confirmation
+    // Store room data — edit shows confirmation; new room goes to payment step
     setPendingRoomData(newRoom);
-    setShowConfirmation(true);
+    if (isEdit) {
+      setShowConfirmation(true);
+    } else {
+      setStep('payment');
+    }
+  };
+
+  const handlePaymentChoice = async (paymentMethod) => {
+    if (!pendingRoomData) return;
+
+    setIsSubmitting(true);
+    setSubmitMessage('');
+
+    try {
+      await onAddRoom(pendingRoomData, paymentMethod);
+      if (paymentMethod === 'cash') {
+        setSubmitMessage('Room added and cash payment recorded successfully.');
+        setTimeout(() => { onClose(); }, 1500);
+      }
+    } catch (error) {
+      setSubmitMessage(t('errorAddingRoom'));
+      setIsSubmitting(false);
+    } finally {
+      if (paymentMethod === 'cash') {
+        setPendingRoomData(null);
+      }
+    }
   };
 
   const handleConfirmSubmit = async () => {
@@ -337,18 +388,10 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
 
     try {
       if (isEdit) {
-        // Edit flow: save and show success before closing
         await new Promise(resolve => setTimeout(resolve, 800));
         onAddRoom(pendingRoomData);
         setSubmitMessage(t('roomUpdatedSuccessfully'));
         setTimeout(() => { onClose(); }, 1500);
-      } else {
-        // New room flow: save room → Cashfree redirect happens in parent (handleAddRoom)
-        // Close the modal immediately so the payment redirect isn't blocked
-        setSubmitMessage('Saving room, redirecting to payment…');
-        await new Promise(resolve => setTimeout(resolve, 600));
-        onClose();
-        onAddRoom(pendingRoomData);
       }
     } catch (error) {
       setSubmitMessage(t('errorAddingRoom'));
@@ -359,12 +402,18 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
     }
   };
 
+  const subscriptionAmount = pendingRoomData
+    ? (ROOM_TYPE_PRICING[pendingRoomData.roomType] ?? ROOM_TYPE_PRICING['1 RK'])
+    : (ROOM_TYPE_PRICING[formData.roomType] ?? ROOM_TYPE_PRICING['1 RK']);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">{isEdit ? t('editRoom') : t('addNewRoom')}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {isEdit ? t('editRoom') : step === 'payment' ? 'Subscription Payment' : t('addNewRoom')}
+          </h2>
           <Button
             variant="outline"
             size="sm"
@@ -390,7 +439,82 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
           </div>
         )}
 
+        {/* Payment Step */}
+        {step === 'payment' && !isEdit && pendingRoomData && (
+          <div className="p-6 space-y-6">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">{pendingRoomData.title}</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {pendingRoomData.roomType} · {SUBSCRIPTION_DURATION_DAYS}-day listing subscription
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-orange-600">₹{subscriptionAmount}</span>
+                <span className="text-sm text-gray-500">one-time fee</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              Choose how you would like to pay for your room listing subscription.
+            </p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => handlePaymentChoice('online')}
+                disabled={isSubmitting}
+                className="w-full flex items-center gap-4 p-4 border-2 border-orange-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-all text-left disabled:opacity-50"
+              >
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Pay Online</p>
+                  <p className="text-sm text-gray-500">Pay securely via Cashfree (UPI, card, netbanking)</p>
+                </div>
+              </button>
+
+              {canCollectCash && (
+                <button
+                  type="button"
+                  onClick={() => handlePaymentChoice('cash')}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center gap-4 p-4 border-2 border-green-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all text-left disabled:opacity-50"
+                >
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Banknote className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Cash Collected</p>
+                    <p className="text-sm text-gray-500">Mark subscription as paid — cash received in person</p>
+                  </div>
+                </button>
+              )}
+            </div>
+
+            <div className="flex justify-between gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep('form')}
+                disabled={isSubmitting}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting}
+              >
+                {t('cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Form */}
+        {(step === 'form' || isEdit) && (
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             {/* Room Title */}
@@ -844,17 +968,18 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
               {isSubmitting ? (
                 <>
                   <div className="loading-spinner mr-2" />
-                  {isEdit ? t('update') + '...' : t('submit') + '...'}
+                  {isEdit ? t('update') + '...' : 'Next...'}
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  {isEdit ? t('update') : t('addRoom')}
+                  {isEdit ? t('update') : 'Next'}
                 </>
               )}
             </Button>
           </div>
         </form>
+        )}
       </div>
 
       {/* Confirmation Modal */}

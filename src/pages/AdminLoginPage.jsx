@@ -12,20 +12,18 @@ import { Button } from '@/components/ui/button.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import { useUserPreferences } from '../contexts/UserPreferencesContext.jsx';
 import InAppToast from '../components/InAppToast.jsx';
+import { authenticateAdmin } from '../utils/adminConfig.js';
 
 const AdminLoginPage = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { setIsAdmin } = useUserPreferences();
+  const { setAdminSession } = useUserPreferences();
   
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false, title: '' });
-
-  // Default admin password - in production, this should be more secure
-  const ADMIN_PASSWORD = '0147@May';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,8 +33,9 @@ const AdminLoginPage = () => {
     // Simulate authentication delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (password === ADMIN_PASSWORD) {
-      setIsAdmin(true);
+    const adminSession = authenticateAdmin(password);
+    if (adminSession) {
+      setAdminSession(true, adminSession.canCollectCash);
       setNotification({
         message: 'You now have access to admin features.',
         type: 'success',

@@ -51,19 +51,49 @@ function normalisePhone(phone) {
 
 /**
  * Best-effort extraction of the request origin for building the return URL.
+ * Cashfree production rejects localhost return URLs — use the deployed site instead.
  */
-function resolveOrigin(req) {
-  if (req.headers.origin) return req.headers.origin;
-  if (req.headers.referer) {
-    try { return new URL(req.headers.referer).origin; } catch { /* ignore */ }
+function resolveOrigin(req, bodyReturnUrl) {
+  const productionFallback =
+    process.env.SITE_URL ||
+    process.env.VITE_API_URL ||
+    'https://www.nivasispace.com';
+
+  const isLocalOrigin = (origin) =>
+    !origin ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1');
+
+  if (bodyReturnUrl && typeof bodyReturnUrl === 'string' && !isLocalOrigin(bodyReturnUrl)) {
+    return bodyReturnUrl.replace(/\/$/, '');
   }
-  if (req.headers.host) {
+
+  let origin;
+  if (req.headers.origin) {
+    origin = req.headers.origin;
+  } else if (req.headers.referer) {
+    try { origin = new URL(req.headers.referer).origin; } catch { /* ignore */ }
+  } else if (req.headers.host) {
     const isLocal =
       req.headers.host.startsWith('localhost') ||
       req.headers.host.startsWith('127.0.0.1');
-    return `${isLocal ? 'http' : 'https'}://${req.headers.host}`;
+    origin = `${isLocal ? 'http' : 'https'}://${req.headers.host}`;
   }
-  return 'https://nivasi.space';
+
+  if (isLocalOrigin(origin)) {
+    return productionFallback.replace(/\/$/, '');
+  }
+
+  return origin || productionFallback.replace(/\/$/, '');
+}
+
+/** Cashfree order_id max length is 50 characters. */
+function buildOrderId(roomId) {
+  const suffix = String(Date.now());
+  const prefix = 'ord_';
+  const maxRoomPart = 50 - prefix.length - suffix.length - 1;
+  const roomPart = roomId.replace(/[^a-zA-Z0-9]/g, '').slice(0, maxRoomPart);
+  return `${prefix}${roomPart}_${suffix}`;
 }
 
 export default async function handler(req, res) {
@@ -85,7 +115,7 @@ export default async function handler(req, res) {
   }
 
   // ── Parse & validate body ──────────────────────────────────────────────────
-  const { roomId, roomType, customerName, customerEmail, customerPhone } = req.body ?? {};
+  const { roomId, roomType, customerName, customerEmail, customerPhone, returnUrl } = req.body ?? {};
 
   // Log full request body for debugging
   console.log('[create-order] request body:', JSON.stringify(req.body));
@@ -152,10 +182,9 @@ export default async function handler(req, res) {
   }
 
   // ── Build order ────────────────────────────────────────────────────────────
-  // Order ID embeds roomId so the webhook can extract it without a DB lookup.
-  // Format: order_<roomId>_<unixMs>
-  const orderId = `order_${normalizedRoomId}_${Date.now()}`;
-  const origin  = resolveOrigin(req);
+  // Format: ord_<roomIdSlice>_<unixMs>  (max 50 chars for Cashfree)
+  const orderId = buildOrderId(normalizedRoomId);
+  const origin  = resolveOrigin(req, returnUrl);
 
   const orderRequest = {
     order_id:       orderId,

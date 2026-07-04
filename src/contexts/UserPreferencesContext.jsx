@@ -29,14 +29,30 @@ export const UserPreferencesProvider = ({ children }) => {
         return sessionStorage.getItem('isAdmin') === 'true';
     });
 
+    const [canCollectCash, setCanCollectCash] = useState(() => {
+        return sessionStorage.getItem('canCollectCash') === 'true';
+    });
+
+    const setAdminSession = (active, cashCollection = false) => {
+        setIsAdmin(active);
+        setCanCollectCash(active && cashCollection);
+    };
+
     useEffect(() => {
         if (isAdmin) {
             console.log('[admin] admin session active: preserving admin mode');
             sessionStorage.setItem('isAdmin', 'true');
+            if (canCollectCash) {
+                sessionStorage.setItem('canCollectCash', 'true');
+            } else {
+                sessionStorage.removeItem('canCollectCash');
+            }
         } else {
             sessionStorage.removeItem('isAdmin');
+            sessionStorage.removeItem('canCollectCash');
+            setCanCollectCash(false);
         }
-    }, [isAdmin]);
+    }, [isAdmin, canCollectCash]);
 
     // Persist changes to localStorage
     useEffect(() => {
@@ -66,7 +82,10 @@ export const UserPreferencesProvider = ({ children }) => {
         hasAcceptedTerms,
         setHasAcceptedTerms,
         isAdmin,
-        setIsAdmin
+        setIsAdmin,
+        canCollectCash,
+        setCanCollectCash,
+        setAdminSession
     };
 
     return (

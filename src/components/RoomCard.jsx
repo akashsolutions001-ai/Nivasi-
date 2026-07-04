@@ -1,11 +1,11 @@
 import React, { useState, useCallback, memo } from 'react';
-import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar, EyeOff, Eye } from 'lucide-react';
+import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar, EyeOff, Eye, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import { isSubscriptionActive, isExpiringSoon, getDaysUntilExpiry } from '../utils/subscriptionConfig.js';
 
-const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew, onVerify, onReject }) => {
+const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, canCollectCash, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew, onCashCollected, onVerify, onReject }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
@@ -74,7 +74,22 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
     return url.replace(/ /g, '%20');
   }, []);
 
+  const needsPayment =
+    hasSubscription &&
+    (room.paymentStatus === 'pending' ||
+      room.paymentStatus === 'expired' ||
+      (room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd)));
+
+  const showCashCollected =
+    canCollectCash &&
+    needsPayment &&
+    typeof onCashCollected === 'function';
+
   const primaryImage = room.images && room.images.length > 0 ? getSafeImageUrl(room.images[0]) : null;
+
+  const handleCashCollected = useCallback(() => {
+    if (onCashCollected) onCashCollected(room);
+  }, [onCashCollected, room]);
 
   const handleToggleHidden = useCallback(() => {
     if (onToggleHidden) {
@@ -298,22 +313,46 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
               </div>
             )}
             {hasSubscription && room.paymentStatus === 'pending' && (
-              <Button
-                onClick={() => onRenew && onRenew(room)}
-                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
-                size="sm"
-              >
-                Pay Listing Subscription (₹{room.subscriptionAmount || 100})
-              </Button>
+              <>
+                <Button
+                  onClick={() => onRenew && onRenew(room)}
+                  className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
+                  size="sm"
+                >
+                  Pay Listing Subscription (₹{room.subscriptionAmount || 100})
+                </Button>
+                {showCashCollected && (
+                  <Button
+                    onClick={handleCashCollected}
+                    className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
+                    size="sm"
+                  >
+                    <Banknote className="w-4 h-4" />
+                    Cash Collected
+                  </Button>
+                )}
+              </>
             )}
             {(room.paymentStatus === 'expired' || (hasSubscription && room.paymentStatus === 'paid' && (!isSubscriptionActive(room.subscriptionEnd) || isExpiringSoon(room.subscriptionEnd)))) && (
-              <Button
-                onClick={() => onRenew && onRenew(room)}
-                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
-                size="sm"
-              >
-                Renew Now
-              </Button>
+              <>
+                <Button
+                  onClick={() => onRenew && onRenew(room)}
+                  className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
+                  size="sm"
+                >
+                  Renew Now
+                </Button>
+                {showCashCollected && (
+                  <Button
+                    onClick={handleCashCollected}
+                    className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
+                    size="sm"
+                  >
+                    <Banknote className="w-4 h-4" />
+                    Cash Collected
+                  </Button>
+                )}
+              </>
             )}
             <Button
               onClick={handleToggleHidden}

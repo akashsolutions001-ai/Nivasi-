@@ -135,9 +135,27 @@ const ProfilePage = () => {
                     const q = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
                     const querySnapshot = await getDocs(q);
                     const rooms = [];
-                    querySnapshot.forEach((doc) => {
-                        rooms.push({ id: doc.id, ...doc.data() });
-                    });
+                    const { releasePlatformRoomOwnership } = await import('../services/roomService.js');
+
+                    for (const docSnap of querySnapshot.docs) {
+                        const data = docSnap.data();
+
+                        if (data.addedByAdmin) continue;
+
+                        // Legacy admin listings: auto-verified on create (no verifiedBy)
+                        const isLegacyAdminListing =
+                            data.verificationStatus === 'verified' &&
+                            !data.verifiedBy;
+
+                        if (isLegacyAdminListing) {
+                            releasePlatformRoomOwnership(docSnap.id).catch((err) =>
+                                console.error('Failed to release platform room ownership:', err)
+                            );
+                            continue;
+                        }
+
+                        rooms.push({ id: docSnap.id, ...data });
+                    }
                     setMyRooms(rooms);
                 } catch (error) {
                     console.error("Error fetching user rooms:", error);
@@ -192,7 +210,7 @@ const ProfilePage = () => {
         try {
             const { updateRoom } = await import('../services/roomService.js');
             const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
-            setMyRooms(prev => prev.map(r => r.id === savedRoom.id ? savedRoom : r));
+            setMyRooms(prev => prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r));
             setEditRoom(null);
             setNotification({
                 message: 'Your room listing has been updated.',
@@ -202,7 +220,7 @@ const ProfilePage = () => {
             });
         } catch (error) {
             console.error('Error updating room:', error);
-            setMyRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r));
+            setMyRooms(prev => prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r));
             setEditRoom(null);
             setNotification({
                 message: 'Changes saved locally. Will sync when connection is restored.',
@@ -619,7 +637,8 @@ const ProfilePage = () => {
                 {editRoom && (
                     <Suspense fallback={<ModalLoadingSpinner />}>
                         <AddRoomModal
-                            room={editRoom}
+                            initialRoom={editRoom}
+                            isEdit
                             onClose={() => setEditRoom(null)}
                             onAddRoom={handleUpdateRoom}
                             isAdmin={false}

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { authenticateAdmin } from '../utils/adminConfig.js';
 
 const AdminLoginModal = ({ onClose, onAdminLogin }) => {
   const { t } = useLanguage();
@@ -17,9 +18,6 @@ const AdminLoginModal = ({ onClose, onAdminLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Default admin password - in production, this should be more secure
-  const ADMIN_PASSWORD = '0147@May';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,8 +27,9 @@ const AdminLoginModal = ({ onClose, onAdminLogin }) => {
     // Simulate authentication delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (password === ADMIN_PASSWORD) {
-      onAdminLogin();
+    const adminSession = authenticateAdmin(password);
+    if (adminSession) {
+      onAdminLogin(adminSession);
       onClose();
     } else {
       setError(t('invalidPassword'));

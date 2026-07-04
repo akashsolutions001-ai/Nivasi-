@@ -1,7 +1,19 @@
 // src/services/paymentService.js
 // Frontend service for handling Cashfree payments
 
+import { getApiBase } from '../utils/apiBase.js';
+
 let cashfreePromise = null;
+
+/** Origin used for Cashfree return_url after payment. */
+function getPaymentReturnOrigin() {
+  const apiBase = getApiBase();
+  const origin = window.location.origin;
+  const isLocal =
+    origin.includes('localhost') || origin.includes('127.0.0.1');
+  if (isLocal) return apiBase;
+  return origin;
+}
 
 /**
  * Dynamically load the Cashfree JS SDK script.
@@ -49,33 +61,32 @@ export async function initiatePayment(orderData) {
   // 1. Ensure Cashfree JS SDK is loaded
   const CashfreeConstructor = await loadCashfreeSDK();
 
-  // 2. Call Vercel Serverless Function to create the payment order
-  // Strip trailing slash from env var to avoid double-slash URLs
-  // Falls back to window.location.origin so mobile/preview builds always hit the right host
-  const API_BASE =
-    import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
-    window.location.origin;
-
+  const API_BASE = getApiBase();
   console.log("[paymentService] API_BASE =", API_BASE);
-
-  if (import.meta.env.DEV && !import.meta.env.VITE_API_URL) {
-    console.warn(
-      "[paymentService] VITE_API_URL is not configured. Local payments will fail unless .env.local is created."
-    );
-  }
 
   const response = await fetch(`${API_BASE}/api/create-order`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(orderData),
+    body: JSON.stringify({
+      ...orderData,
+      // Cashfree production rejects localhost return URLs
+      returnUrl: getPaymentReturnOrigin(),
+    }),
   });
 
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
     console.error('[paymentService] create-order failed:', response.status, errBody);
-    throw new Error(errBody.error || `Failed to create payment order (${response.status})`);
+    const hint = response.status === 404 && import.meta.env.DEV
+      ? ' Restart the dev server (npm run dev) so /api requests proxy to the deployed backend.'
+      : '';
+    const detailMsg =
+      typeof errBody.detail === 'string'
+        ? errBody.detail
+        : errBody.detail?.message || errBody.detail?.error?.message;
+    throw new Error(detailMsg || errBody.error || `Failed to create payment order (${response.status}).${hint}`);
   }
 
   // API returns snake_case keys: payment_session_id, order_id
@@ -114,10 +125,7 @@ export async function initiatePayment(orderData) {
  * @returns {Promise<object>} - { status, roomId, ... }
  */
 export async function verifyPayment(orderId) {
-  // Strip trailing slash from env var; fall back to current origin
-  const API_BASE =
-    import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
-    window.location.origin;
+  const API_BASE = getApiBase();
 
   const response = await fetch(
     `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`

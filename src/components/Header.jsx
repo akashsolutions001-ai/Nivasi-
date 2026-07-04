@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Phone, Shield, User, Settings, TrendingUp, Calendar, MapPin } from 'lucide-react';
+import { Phone, Shield, User, Settings, Calendar, MapPin, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import Logo from './Logo.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
@@ -12,12 +12,15 @@ const Header = ({
     onChangeLocation,
     onChangeGender,
     onContactUs,
-    onShowBookingManagement,
-    onShowUserStatistics
+    onShowBookingManagement
 }) => {
     const { t } = useLanguage();
-    const { selectedLocation, selectedGender, isAdmin } = useUserPreferences();
+    const { selectedLocation, selectedGender, isAdmin, setAdminSession } = useUserPreferences();
     const navigate = useNavigate();
+
+    const handleAdminLogout = () => {
+        setAdminSession(false);
+    };
 
     return (
         <header className="header-gradient text-white shadow-lg sticky top-0 z-40">
@@ -86,6 +89,31 @@ const Header = ({
                             <span>Contact</span>
                         </Button>
                     </div>
+
+                    {isAdmin && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div className="col-span-2 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-white/20 border border-white/30 text-white text-xs font-semibold">
+                                <Shield className="w-3.5 h-3.5" />
+                                {t('adminMode')}
+                            </div>
+                            <Button
+                                variant="outline"
+                                onClick={onShowBookingManagement}
+                                className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5"
+                            >
+                                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>{t('manageBookings') || 'Bookings'}</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleAdminLogout}
+                                className="w-full bg-red-500/25 border-red-300/40 text-white hover:bg-red-500/35 backdrop-blur-sm text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5"
+                            >
+                                <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>{t('logout')}</span>
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Desktop Layout */}
@@ -139,11 +167,11 @@ const Header = ({
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={onShowUserStatistics}
-                                    className="w-full sm:w-auto bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
+                                    onClick={handleAdminLogout}
+                                    className="w-full sm:w-auto bg-red-500/25 border-red-300/40 text-white hover:bg-red-500/35 backdrop-blur-sm"
                                 >
-                                    <TrendingUp className="w-4 h-4 mr-2" />
-                                    User Stats
+                                    <LogOut className="w-4 h-4 mr-2" />
+                                    {t('logout')}
                                 </Button>
                             </>
                         )}

@@ -91,7 +91,7 @@ const deduplicateRooms = (rooms) => {
 function App() {
   const { t, currentLanguage } = useLanguage();
   const { user, loading, isAuthenticated } = useAuth();
-  const { selectedGender, selectedLocation, isAdmin, setIsAdmin } = useUserPreferences();
+  const { selectedGender, selectedLocation, isAdmin, setAdminSession, canCollectCash } = useUserPreferences();
 
   const [rooms, setRooms] = useState([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
@@ -508,27 +508,53 @@ function App() {
     });
   }, [requireAuth]);
 
-  const handleAdminLogin = useCallback(() => {
+  const handleAdminLogin = useCallback((adminSession = {}) => {
     requireAuth('admin', () => {
-      setIsAdmin(true);
+      setAdminSession(true, adminSession.canCollectCash);
       setShowAdminLogin(false);
       setShowAddForm(true);
       setNotification({
-        message: 'You now have access to add, edit, and delete rooms.',
+        message: adminSession.canCollectCash
+          ? 'Admin mode activated with cash collection access.'
+          : 'You now have access to add, edit, and delete rooms.',
         type: 'success',
         isVisible: true,
         title: 'Admin Mode Activated!'
       });
     });
-  }, [setIsAdmin, requireAuth]);
+  }, [setAdminSession, requireAuth]);
 
-  const handleAddRoom = useCallback(async (newRoom) => {
+  const handleAddRoom = useCallback(async (newRoom, paymentMethod = 'online') => {
     try {
-      const { addRoom } = await import('./services/roomService.js');
+      const { addRoom, activateCashSubscription } = await import('./services/roomService.js');
       const savedRoom = await addRoom(newRoom, user, isAdmin);
+
+      if (paymentMethod === 'cash') {
+        if (!canCollectCash) {
+          throw new Error('Not authorized for cash collection');
+        }
+        await activateCashSubscription(savedRoom.id);
+        const activatedRoom = {
+          ...savedRoom,
+          paymentStatus: 'paid',
+          subscriptionStatus: 'active',
+          isPublished: true,
+          paymentMethod: 'cash'
+        };
+        setRooms(prev => deduplicateRooms([activatedRoom, ...prev]));
+        setShowAddForm(false);
+        setNotification({
+          message: 'Room added and cash payment recorded. Listing is now live.',
+          type: 'success',
+          isVisible: true,
+          title: 'Cash Payment Recorded'
+        });
+        return;
+      }
+
       setRooms(prev => deduplicateRooms([savedRoom, ...prev]));
       setShowAddForm(false);
-      
+
       setNotification({
         message: 'Redirecting to Cashfree to complete subscription payment...',
         type: 'info',
@@ -536,7 +562,6 @@ function App() {
         title: 'Redirecting to Payment'
       });
 
-      // Initiate Cashfree payment checkout
       await initiatePayment({
         roomId: savedRoom.id,
         roomType: savedRoom.roomType || savedRoom.rooms || '1 RK',
@@ -556,8 +581,9 @@ function App() {
         isVisible: true,
         title: isDuplicateError ? 'Subscription Active' : 'Payment Error'
       });
+      throw error;
     }
-  }, [user]);
+  }, [user, isAdmin, canCollectCash]);
 
   const handleRenewRoomSubscription = useCallback(async (room) => {
     try {
@@ -588,6 +614,34 @@ function App() {
     }
   }, [user]);
 
+  const handleCashCollectedForRoom = useCallback(async (room) => {
+    if (!canCollectCash) return;
+
+    try {
+      const { activateCashSubscription } = await import('./services/roomService.js');
+      const result = await activateCashSubscription(room.id);
+      setRooms(prev =>
+        deduplicateRooms(
+          prev.map(r => (r.id === room.id ? { ...r, ...result } : r))
+        )
+      );
+      setNotification({
+        message: `"${room.title}" subscription marked as paid. Listing is now live.`,
+        type: 'success',
+        isVisible: true,
+        title: 'Cash Payment Recorded'
+      });
+    } catch (error) {
+      console.error('Error recording cash payment:', error);
+      setNotification({
+        message: 'Failed to record cash payment: ' + error.message,
+        type: 'error',
+        isVisible: true,
+        title: 'Cash Payment Error'
+      });
+    }
+  }, [canCollectCash]);
+
   const handleBookingSuccess = useCallback(() => {
     setShowBookingModal(false);
     setSelectedRoomForBooking(null);
@@ -603,7 +657,7 @@ function App() {
     try {
       const { updateRoom } = await import('./services/roomService.js');
       const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? savedRoom : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r)));
       console.log('[admin] action completed: room updated');
       setEditRoom(null);
       setNotification({
@@ -615,7 +669,7 @@ function App() {
     } catch (error) {
       console.error('Error updating room:', error);
       // Still update locally even if Firestore fails
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === updatedRoom.id ? updatedRoom : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r)));
       setEditRoom(null);
       setNotification({
         message: 'Changes saved locally. Will sync when connection is restored.',
@@ -1142,10 +1196,12 @@ function App() {
                       }}
                       isAdmin={isAdmin}
                       isOwner={user && room.ownerId === user.uid}
+                      canCollectCash={canCollectCash}
                       onEdit={() => setEditRoom(room)}
                       onDelete={() => handleRequestDeleteRoom(room)}
                       onToggleHidden={() => handleRequestToggleHidden(room)}
                       onRenew={() => requireAuth('renew-room', () => handleRenewRoomSubscription(room))}
+                      onCashCollected={() => handleCashCollectedForRoom(room)}
                       onVerify={() => handleVerifyRoom(room)}
                       onReject={() => handleRejectRoom(room)}
                       t={t}
@@ -1197,6 +1253,7 @@ function App() {
               onClose={() => setShowAddForm(false)}
               onAddRoom={handleAddRoom}
               isAdmin={isAdmin}
+              canCollectCash={canCollectCash}
             />
           </Suspense>
         )

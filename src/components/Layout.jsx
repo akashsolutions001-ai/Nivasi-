@@ -16,7 +16,6 @@ const LocationSelectionModal = lazy(() => import('./LocationSelectionModal.jsx')
 const GenderSelectionModal = lazy(() => import('./GenderSelectionModal.jsx'));
 const UserProfileModal = lazy(() => import('./UserProfileModal.jsx'));
 const BookingManagementModal = lazy(() => import('./BookingManagementModal.jsx'));
-const UserStatisticsModal = lazy(() => import('./UserStatisticsModal.jsx'));
 
 // Loading component
 const ModalLoadingSpinner = () => (
@@ -46,7 +45,6 @@ const Layout = () => {
     const [showContactPopup, setShowContactPopup] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showBookingManagement, setShowBookingManagement] = useState(false);
-    const [showUserStatistics, setShowUserStatistics] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false });
 
@@ -171,7 +169,6 @@ const Layout = () => {
                     onContactUs={() => setShowContactPopup(true)}
                     onShowProfile={() => setShowProfileModal(true)}
                     onShowBookingManagement={() => setShowBookingManagement(true)}
-                    onShowUserStatistics={() => setShowUserStatistics(true)}
                 />
             )}
 
@@ -222,14 +219,6 @@ const Layout = () => {
                     <BookingManagementModal
                         isOpen={showBookingManagement}
                         onClose={() => setShowBookingManagement(false)}
-                    />
-                </Suspense>
-            )}
-
-            {showUserStatistics && (
-                <Suspense fallback={<ModalLoadingSpinner />}>
-                    <UserStatisticsModal
-                        onClose={() => setShowUserStatistics(false)}
                     />
                 </Suspense>
             )}
