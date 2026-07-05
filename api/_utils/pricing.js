@@ -33,3 +33,21 @@ export function getAmountForRoomType(roomType) {
   }
   return amount;
 }
+
+export const MAX_ROOMS_PER_BATCH = 10;
+
+export function getAmountForRoomBatch(roomType, count = 1) {
+  const qty = Math.min(MAX_ROOMS_PER_BATCH, Math.max(1, Number(count) || 1));
+  return getAmountForRoomType(roomType) * qty;
+}
+
+function isValidFirestoreRoomId(roomId) {
+  return (
+    roomId &&
+    typeof roomId === 'string' &&
+    !roomId.startsWith('178') &&
+    !/^\d+$/.test(roomId)
+  );
+}
+
+export { isValidFirestoreRoomId };

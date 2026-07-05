@@ -524,27 +524,32 @@ function App() {
     });
   }, [setAdminSession, requireAuth]);
 
-  const handleAddRoom = useCallback(async (newRoom, paymentMethod = 'online') => {
+  const handleAddRoom = useCallback(async (roomData, paymentMethod = 'online') => {
+    const isBatch = roomData?.rooms && Array.isArray(roomData.rooms);
+    const roomsToAdd = isBatch ? roomData.rooms : [roomData];
+
     try {
-      const { addRoom, activateCashSubscription } = await import('./services/roomService.js');
-      const savedRoom = await addRoom(newRoom, user, isAdmin);
+      const { addRoom, activateCashSubscriptionForRooms } = await import('./services/roomService.js');
+      const savedRooms = [];
+
+      for (const room of roomsToAdd) {
+        const savedRoom = await addRoom(room, user, isAdmin);
+        savedRooms.push(savedRoom);
+      }
 
       if (paymentMethod === 'cash') {
         if (!canCollectCash) {
           throw new Error('Not authorized for cash collection');
         }
-        await activateCashSubscription(savedRoom.id);
-        const activatedRoom = {
-          ...savedRoom,
-          paymentStatus: 'paid',
-          subscriptionStatus: 'active',
-          isPublished: true,
-          paymentMethod: 'cash'
-        };
-        setRooms(prev => deduplicateRooms([activatedRoom, ...prev]));
+        const activated = await activateCashSubscriptionForRooms(savedRooms.map((r) => r.id));
+        const activatedMap = new Map(activated.map((r) => [r.id, r]));
+        const mergedRooms = savedRooms.map((r) => ({ ...r, ...activatedMap.get(r.id) }));
+        setRooms((prev) => deduplicateRooms([...mergedRooms, ...prev]));
         setShowAddForm(false);
         setNotification({
-          message: 'Room added and cash payment recorded. Listing is now live.',
+          message: mergedRooms.length > 1
+            ? `${mergedRooms.length} rooms added and cash payment recorded. Listings are now live.`
+            : 'Room added and cash payment recorded. Listing is now live.',
           type: 'success',
           isVisible: true,
           title: 'Cash Payment Recorded'
@@ -552,7 +557,7 @@ function App() {
         return;
       }
 
-      setRooms(prev => deduplicateRooms([savedRoom, ...prev]));
+      setRooms((prev) => deduplicateRooms([...savedRooms, ...prev]));
       setShowAddForm(false);
 
       setNotification({
@@ -562,12 +567,15 @@ function App() {
         title: 'Redirecting to Payment'
       });
 
+      const primary = savedRooms[0];
       await initiatePayment({
-        roomId: savedRoom.id,
-        roomType: savedRoom.roomType || savedRoom.rooms || '1 RK',
+        roomId: primary.id,
+        roomIds: savedRooms.map((r) => r.id),
+        roomCount: savedRooms.length,
+        roomType: primary.roomType || primary.rooms || '1 RK',
         customerName: user?.displayName || 'Nivasi Host',
         customerEmail: user?.email || 'payments@nivasi.space',
-        customerPhone: savedRoom.contact || '9999999999'
+        customerPhone: primary.contact || '9999999999'
       });
     } catch (error) {
       console.error('Error adding room or initiating payment:', error);

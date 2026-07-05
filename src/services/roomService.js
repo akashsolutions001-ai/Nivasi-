@@ -153,10 +153,20 @@ export const addRoom = async (roomData, user, isAdmin) => {
  * Activate subscription after cash payment collected by admin
  */
 export const activateCashSubscription = async (roomId) => {
+    return activateCashSubscriptionForRooms([roomId]);
+};
+
+/**
+ * Activate subscription after cash payment for one or more rooms
+ */
+export const activateCashSubscriptionForRooms = async (roomIds) => {
+    const ids = Array.isArray(roomIds) ? roomIds.filter(Boolean) : [roomIds];
+    if (ids.length === 0) return [];
+
     try {
         const now = new Date();
         const subscriptionEnd = new Date(now.getTime() + SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000);
-        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        const paymentOrderId = `cash-${ids[0]}-${Date.now()}`;
 
         const updatePayload = {
             paymentStatus: 'paid',
@@ -164,17 +174,16 @@ export const activateCashSubscription = async (roomId) => {
             subscriptionStart: now,
             subscriptionEnd,
             paymentMethod: 'cash',
-            paymentOrderId: `cash-${roomId}-${Date.now()}`,
+            paymentOrderId,
             isPublished: true,
             updatedAt: serverTimestamp()
         };
 
-        await updateDoc(roomRef, updatePayload);
+        await Promise.all(
+            ids.map((roomId) => updateDoc(doc(db, ROOMS_COLLECTION, roomId), updatePayload))
+        );
 
-        return {
-            ...updatePayload,
-            id: roomId
-        };
+        return ids.map((id) => ({ ...updatePayload, id }));
     } catch (error) {
         console.error('Error activating cash subscription:', error);
         throw error;

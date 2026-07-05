@@ -119,7 +119,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Payment mapping not found' });
   }
   const paymentData = paymentSnap.data();
-  const roomId = paymentData.roomId;
+  const roomIds = Array.isArray(paymentData.roomIds) && paymentData.roomIds.length > 0
+    ? paymentData.roomIds
+    : paymentData.roomId
+      ? [paymentData.roomId]
+      : [];
+  const roomId = roomIds[0];
   if (!roomId) {
     console.error(`[cashfree-webhook] roomId missing in payment doc ${orderId}`);
     return res.status(400).json({ error: 'roomId missing in payment document' });
@@ -134,14 +139,14 @@ export default async function handler(req, res) {
 
   // 7️⃣ Route based on known statuses
   if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' || incomingStatus === 'PAID') {
-    await handleSuccess({ event, roomId, orderId, paymentRef });
+    await handleSuccess({ event, roomId, roomIds, orderId, paymentRef });
   } else if (
     eventType === 'PAYMENT_FAILED_WEBHOOK' ||
     incomingStatus === 'FAILURE' ||
     incomingStatus === 'CANCELLED' ||
     incomingStatus === 'USER_DROPPED'
   ) {
-    await handleFailure({ event, roomId, orderId, paymentRef, incomingStatus });
+    await handleFailure({ event, roomId, roomIds, orderId, paymentRef, incomingStatus });
   } else {
     console.log(`[cashfree-webhook] Unhandled event type: ${eventType}`);
   }
@@ -151,27 +156,31 @@ export default async function handler(req, res) {
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
-async function handleSuccess({ event, roomId, orderId, paymentRef }) {
+async function handleSuccess({ event, roomId, roomIds, orderId, paymentRef }) {
   const cfPaymentId = event?.data?.payment?.cf_payment_id || orderId;
   const now = admin.firestore.Timestamp.now();
   const subscriptionEnd = admin.firestore.Timestamp.fromDate(
     new Date(Date.now() + SUBSCRIPTION_DURATION_DAYS * 86_400_000)
   );
+  const ids = roomIds?.length ? roomIds : [roomId];
 
-  // Update room document – publish and activate subscription
-  try {
-    await admin.firestore().collection('rooms').doc(roomId).update({
-      paymentStatus: 'paid',
-      subscriptionStatus: 'active',
-      subscriptionStart: now,
-      subscriptionEnd,
-      paymentOrderId: String(cfPaymentId),
-      isPublished: true,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    safeLog({ event: event.type, orderId, roomId, status: 'PAID', firestore: 'room updated' });
-  } catch (e) {
-    console.error(`[cashfree-webhook] Room update failed for ${roomId}:`, e.message);
+  const roomPayload = {
+    paymentStatus: 'paid',
+    subscriptionStatus: 'active',
+    subscriptionStart: now,
+    subscriptionEnd,
+    paymentOrderId: String(cfPaymentId),
+    isPublished: true,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  for (const id of ids) {
+    try {
+      await admin.firestore().collection('rooms').doc(id).update(roomPayload);
+      safeLog({ event: event.type, orderId, roomId: id, status: 'PAID', firestore: 'room updated' });
+    } catch (e) {
+      console.error(`[cashfree-webhook] Room update failed for ${id}:`, e.message);
+    }
   }
 
   // Update payment document – idempotency guard already applied above
@@ -187,13 +196,14 @@ async function handleSuccess({ event, roomId, orderId, paymentRef }) {
   }
 }
 
-async function handleFailure({ event, roomId, orderId, paymentRef, incomingStatus }) {
+async function handleFailure({ event, roomId, roomIds, orderId, paymentRef, incomingStatus }) {
   const statusMap = {
     FAILURE: 'failed',
     CANCELLED: 'cancelled',
     USER_DROPPED: 'cancelled'
   };
   const paymentStatus = statusMap[incomingStatus] || 'failed';
+  const ids = roomIds?.length ? roomIds : [roomId];
 
   // Update payment document
   try {
@@ -208,13 +218,15 @@ async function handleFailure({ event, roomId, orderId, paymentRef, incomingStatu
   }
 
   // Update room paymentStatus only – do NOT publish on failure
-  try {
-    await admin.firestore().collection('rooms').doc(roomId).update({
-      paymentStatus: paymentStatus,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    safeLog({ event: event?.type, orderId, roomId, status: incomingStatus, firestore: 'room payment flag updated' });
-  } catch (e) {
-    console.error(`[cashfree-webhook] Room update failed for ${roomId}:`, e.message);
+  for (const id of ids) {
+    try {
+      await admin.firestore().collection('rooms').doc(id).update({
+        paymentStatus: paymentStatus,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      safeLog({ event: event?.type, orderId, roomId: id, status: incomingStatus, firestore: 'room payment flag updated' });
+    } catch (e) {
+      console.error(`[cashfree-webhook] Room update failed for ${id}:`, e.message);
+    }
   }
 }

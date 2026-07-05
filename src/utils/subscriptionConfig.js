@@ -24,6 +24,22 @@ export function getSubscriptionAmount(roomType) {
   return price;
 }
 
+/** All room types can be added in bulk (same details, separate listings). */
+export const MULTI_ROOM_TYPES = Object.keys(ROOM_TYPE_PRICING);
+
+export const MAX_ROOMS_PER_BATCH = 10;
+
+/**
+ * Total registration fee for multiple rooms of the same type.
+ * @param {string} roomType
+ * @param {number} count
+ * @returns {number}
+ */
+export function getSubscriptionTotal(roomType, count = 1) {
+  const qty = Math.min(MAX_ROOMS_PER_BATCH, Math.max(1, Number(count) || 1));
+  return getSubscriptionAmount(roomType) * qty;
+}
+
 /**
  * Check if subscription is active
  * @param {object|string|number} subscriptionEnd - Firebase Timestamp, Date, or milliseconds

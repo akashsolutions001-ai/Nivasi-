@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import ConfirmationModal from './ConfirmationModal.jsx';
-import { ROOM_TYPE_PRICING, SUBSCRIPTION_DURATION_DAYS } from '../utils/subscriptionConfig.js';
+import { ROOM_TYPE_PRICING, SUBSCRIPTION_DURATION_DAYS, MAX_ROOMS_PER_BATCH, getSubscriptionTotal } from '../utils/subscriptionConfig.js';
 
 // Predefined features list
 const AVAILABLE_FEATURES = [
@@ -94,6 +94,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     imagePaths: Array.isArray(initialRoom.images) ? initialRoom.images.join('\n') : '',
     billInclusion: initialRoom.billInclusion || 'lightAndWater',
     roomType: initialRoom.roomType || initialRoom.rooms || '1 RK',
+    roomCount: '1',
     pricingType: initialRoom.pricingType || 'perStudent',
     selectedConditions: initialRoom.selectedConditions || [],
     advance: initialRoom.advance ?? '',
@@ -115,6 +116,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     imagePaths: '',
     billInclusion: 'lightAndWater',
     roomType: '1 RK',
+    roomCount: '1',
     pricingType: 'perStudent',
     selectedConditions: [],
     advance: '',
@@ -251,6 +253,13 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       newErrors.images = t('imagesRequired');
     }
 
+    if (!isEdit) {
+      const count = parseInt(formData.roomCount, 10);
+      if (!count || count < 1 || count > MAX_ROOMS_PER_BATCH) {
+        newErrors.roomCount = `Enter a number between 1 and ${MAX_ROOMS_PER_BATCH}`;
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -302,9 +311,14 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     const adv = formData.advance != null && formData.advance !== '' && !isNaN(Number(formData.advance)) ? Number(formData.advance) : undefined;
     const dep = formData.deposit != null && formData.deposit !== '' && !isNaN(Number(formData.deposit)) ? Number(formData.deposit) : undefined;
 
-    const newRoom = {
-      id: isEdit && initialRoom ? initialRoom.id : Date.now(),
-      title: formData.title.trim(),
+    const allowsMultiple = !isEdit;
+    const roomCount = allowsMultiple
+      ? Math.min(MAX_ROOMS_PER_BATCH, Math.max(1, parseInt(formData.roomCount, 10) || 1))
+      : 1;
+    const baseTitle = formData.title.trim();
+
+    const buildRoomPayload = (titleSuffix) => ({
+      title: titleSuffix ? `${baseTitle} (${titleSuffix})` : baseTitle,
       rent: parseInt(formData.rent),
       pricingType: formData.pricingType,
       note: note || undefined,
@@ -326,6 +340,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       ...(adv != null && !isNaN(adv) ? { advance: adv } : {}),
       ...(dep != null && !isNaN(dep) ? { deposit: dep } : {}),
       ...(isEdit && initialRoom ? {
+        id: initialRoom.id,
         verificationStatus: initialRoom.verificationStatus,
         verifiedAt: initialRoom.verifiedAt,
         verifiedBy: initialRoom.verifiedBy,
@@ -346,15 +361,31 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
         roomStatus: initialRoom.roomStatus,
         visibility: initialRoom.visibility
       } : {})
-    };
+    });
 
-    // Store room data — edit shows confirmation; new room goes to payment step
-    setPendingRoomData(newRoom);
     if (isEdit) {
+      setPendingRoomData(buildRoomPayload());
       setShowConfirmation(true);
-    } else {
-      setStep('payment');
+      return;
     }
+
+    const rooms = Array.from({ length: roomCount }, (_, i) => ({
+      ...buildRoomPayload(roomCount > 1 ? String(i + 1) : null),
+      id: Date.now() + i
+    }));
+
+    if (roomCount > 1) {
+      setPendingRoomData({
+        rooms,
+        roomCount,
+        roomType: formData.roomType,
+        title: baseTitle,
+        totalSubscriptionAmount: getSubscriptionTotal(formData.roomType, roomCount)
+      });
+    } else {
+      setPendingRoomData(rooms[0]);
+    }
+    setStep('payment');
   };
 
   const handlePaymentChoice = async (paymentMethod) => {
@@ -366,7 +397,12 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     try {
       await onAddRoom(pendingRoomData, paymentMethod);
       if (paymentMethod === 'cash') {
-        setSubmitMessage('Room added and cash payment recorded successfully.');
+        const count = pendingRoomData.rooms?.length || 1;
+        setSubmitMessage(
+          count > 1
+            ? `${count} rooms added and cash payment recorded successfully.`
+            : 'Room added and cash payment recorded successfully.'
+        );
         setTimeout(() => { onClose(); }, 1500);
       }
     } catch (error) {
@@ -402,9 +438,20 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     }
   };
 
-  const subscriptionAmount = pendingRoomData
-    ? (ROOM_TYPE_PRICING[pendingRoomData.roomType] ?? ROOM_TYPE_PRICING['1 RK'])
-    : (ROOM_TYPE_PRICING[formData.roomType] ?? ROOM_TYPE_PRICING['1 RK']);
+  const isBatchPending = pendingRoomData?.rooms?.length > 1;
+  const pendingRoomCount = isBatchPending
+    ? pendingRoomData.roomCount
+    : 1;
+  const pendingRoomType = isBatchPending
+    ? pendingRoomData.roomType
+    : pendingRoomData?.roomType;
+  const unitSubscriptionAmount = ROOM_TYPE_PRICING[pendingRoomType || formData.roomType] ?? ROOM_TYPE_PRICING['1 RK'];
+  const formRoomCount = Math.min(MAX_ROOMS_PER_BATCH, Math.max(1, parseInt(formData.roomCount, 10) || 1));
+  const formUnitPrice = ROOM_TYPE_PRICING[formData.roomType] ?? ROOM_TYPE_PRICING['1 RK'];
+  const formTotalSubscription = formUnitPrice * formRoomCount;
+  const subscriptionAmount = isBatchPending
+    ? (pendingRoomData.totalSubscriptionAmount ?? unitSubscriptionAmount * pendingRoomCount)
+    : unitSubscriptionAmount;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -443,13 +490,25 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
         {step === 'payment' && !isEdit && pendingRoomData && (
           <div className="p-6 space-y-6">
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-5">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">{pendingRoomData.title}</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                {pendingRoomData.roomType} · {SUBSCRIPTION_DURATION_DAYS}-day listing subscription
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                {isBatchPending ? pendingRoomData.title : pendingRoomData.title}
+              </h3>
+              <p className="text-sm text-gray-600 mb-1">
+                {pendingRoomType} · {SUBSCRIPTION_DURATION_DAYS}-day listing subscription
               </p>
-              <div className="flex items-baseline gap-2">
+              {isBatchPending && (
+                <p className="text-sm text-gray-600 mb-4">
+                  {pendingRoomCount} separate listings · titles numbered (1), (2), …
+                </p>
+              )}
+              <div className="flex flex-wrap items-baseline gap-2">
+                {isBatchPending && (
+                  <span className="text-sm text-gray-600">
+                    {pendingRoomType} x {pendingRoomCount} · ₹{unitSubscriptionAmount} each =
+                  </span>
+                )}
                 <span className="text-3xl font-bold text-orange-600">₹{subscriptionAmount}</span>
-                <span className="text-sm text-gray-500">one-time fee</span>
+                <span className="text-sm text-gray-500">one-time registration fee</span>
               </div>
             </div>
 
@@ -628,11 +687,50 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
-                <div className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded p-2 flex items-center justify-between">
-                  <span>Subscription: <strong>₹{ROOM_TYPE_PRICING[formData.roomType || '1 RK']}</strong></span>
-                  <span>Duration: <strong>{SUBSCRIPTION_DURATION_DAYS} Days</strong></span>
+                <div className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded p-2 space-y-1">
+                  {formRoomCount > 1 ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span>Per room: <strong>₹{formUnitPrice}</strong></span>
+                        <span>Duration: <strong>{SUBSCRIPTION_DURATION_DAYS} Days</strong></span>
+                      </div>
+                      <div className="font-semibold">
+                        Total registration: {formData.roomType} x {formRoomCount} = <strong>₹{formTotalSubscription}</strong>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span>Subscription: <strong>₹{formUnitPrice}</strong></span>
+                      <span>Duration: <strong>{SUBSCRIPTION_DURATION_DAYS} Days</strong></span>
+                    </div>
+                  )}
                 </div>
               </div>
+              {!isEdit && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number of rooms to add *
+                  </label>
+                  <select
+                    name="roomCount"
+                    value={formData.roomCount}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.roomCount ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    {Array.from({ length: MAX_ROOMS_PER_BATCH }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={String(n)}>
+                        {formData.roomType} x {n} — ₹{formUnitPrice * n}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Same details for each room. Each gets its own listing (e.g. &quot;{formData.title.trim() || 'My PG'} (1)&quot;, &quot;{formData.title.trim() || 'My PG'} (2)&quot;).
+                  </p>
+                  {errors.roomCount && (
+                    <p className="text-red-500 text-sm mt-1">{errors.roomCount}</p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Pricing *</label>
                 <div className="flex gap-4">

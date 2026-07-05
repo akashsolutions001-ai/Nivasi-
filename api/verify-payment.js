@@ -83,72 +83,74 @@ export default async function handler(req, res) {
     }
     
     const paymentData = paymentSnap.data();
-    const roomId = paymentData.roomId;
-    
-    if (!roomId) {
+    const roomIds = Array.isArray(paymentData.roomIds) && paymentData.roomIds.length > 0
+      ? paymentData.roomIds
+      : paymentData.roomId
+        ? [paymentData.roomId]
+        : [];
+
+    if (roomIds.length === 0) {
       console.error(`[verify-payment] roomId missing in payment mapping for orderId: ${orderId}`);
       return res.status(400).json({ error: 'Invalid payment mapping: missing roomId' });
     }
 
     console.log(`[verify-payment] payment document: found`);
-    console.log(`[verify-payment] roomId: ${roomId}`);
+    console.log(`[verify-payment] roomIds: ${roomIds.join(', ')}`);
 
     const isPaid = data.order_status === 'PAID';
     console.log(`[verify-payment] Cashfree status: ${data.order_status}`);
-    
-    // Connect to Firestore and update the room
-    const roomRef = db.collection('rooms').doc(roomId);
-    const roomSnap = await roomRef.get();
 
-    if (!roomSnap.exists) {
-      return res.status(404).json({ error: `Room not found with ID ${roomId}` });
-    }
-
-    const currentData = roomSnap.data();
+    const subscriptionUpdate = (now, subscriptionEnd, orderIdValue) => ({
+      paymentStatus: 'paid',
+      subscriptionStatus: 'active',
+      subscriptionStart: admin.firestore.Timestamp.fromDate(now),
+      subscriptionEnd: admin.firestore.Timestamp.fromDate(subscriptionEnd),
+      paymentOrderId: String(orderIdValue),
+      isPublished: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     if (isPaid) {
       const now = new Date();
-      // 90 days subscription
       const subscriptionEnd = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      const orderIdValue = data.cf_order_id || data.order_id || '';
+      const payload = subscriptionUpdate(now, subscriptionEnd, orderIdValue);
 
-      const updatePayload = {
-        paymentStatus: 'paid',
-        subscriptionStatus: 'active',
-        subscriptionStart: admin.firestore.Timestamp.fromDate(now),
-        subscriptionEnd: admin.firestore.Timestamp.fromDate(subscriptionEnd),
-        paymentOrderId: String(data.cf_order_id || data.order_id || ''),
-        isPublished: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
+      for (const id of roomIds) {
+        const roomRef = db.collection('rooms').doc(id);
+        const roomSnap = await roomRef.get();
+        if (!roomSnap.exists) {
+          return res.status(404).json({ error: `Room not found with ID ${id}` });
+        }
+        await roomRef.update(payload);
+      }
 
-      await roomRef.update(updatePayload);
-      
-      // Update payment record
       await paymentRef.update({
         status: data.order_status,
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
         cashfreeStatus: data.order_status
       });
 
-      console.log(`[verify-payment] Firestore updated`);
-      
+      console.log(`[verify-payment] Firestore updated for ${roomIds.length} room(s)`);
+
       return res.status(200).json({
         success: true,
-        roomId,
+        roomId: roomIds[0],
+        roomIds,
         orderId,
         paymentStatus: 'paid',
         subscriptionStatus: 'active'
       });
     } else {
-      // Payment not successful (could be ACTIVE, FAILED, etc.)
       const updatePayload = {
         paymentStatus: data.order_status === 'FAILED' ? 'failed' : 'pending',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      await roomRef.update(updatePayload);
+      for (const id of roomIds) {
+        await db.collection('rooms').doc(id).update(updatePayload);
+      }
 
-      // Update payment record
       await paymentRef.update({
         status: data.order_status,
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -159,7 +161,8 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: false,
-        roomId,
+        roomId: roomIds[0],
+        roomIds,
         orderId,
         paymentStatus: updatePayload.paymentStatus,
         subscriptionStatus: 'pending'

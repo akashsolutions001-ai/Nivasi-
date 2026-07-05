@@ -5,7 +5,7 @@
 // Returns: { payment_session_id, order_id, order_amount, order_status }
 
 import { Cashfree } from 'cashfree-pg';
-import { getAmountForRoomType } from './_utils/pricing.js';
+import { getAmountForRoomType, getAmountForRoomBatch, isValidFirestoreRoomId } from './_utils/pricing.js';
 import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
@@ -115,21 +115,32 @@ export default async function handler(req, res) {
   }
 
   // ── Parse & validate body ──────────────────────────────────────────────────
-  const { roomId, roomType, customerName, customerEmail, customerPhone, returnUrl } = req.body ?? {};
+  const { roomId, roomIds, roomCount, roomType, customerName, customerEmail, customerPhone, returnUrl } = req.body ?? {};
 
   // Log full request body for debugging
   console.log('[create-order] request body:', JSON.stringify(req.body));
-  console.log('[create-order] received roomId:', roomId);
 
-  // Strict validation: roomId MUST be a Firestore-generated document id (alphanumeric string,
-  // NOT a numeric timestamp like 1781760033930 and NOT starting with '178...).
-  if (!roomId || typeof roomId !== 'string' || roomId.startsWith('178') || /^\d+$/.test(roomId)) {
-    console.error('[create-order] Invalid roomId received:', roomId);
+  const normalizedRoomIds = Array.isArray(roomIds) && roomIds.length > 0
+    ? roomIds.map((id) => String(id).trim()).filter(Boolean)
+    : roomId
+      ? [String(roomId).trim()]
+      : [];
+
+  console.log('[create-order] received roomIds:', normalizedRoomIds);
+
+  if (normalizedRoomIds.length === 0 || normalizedRoomIds.some((id) => !isValidFirestoreRoomId(id))) {
+    console.error('[create-order] Invalid roomId(s) received:', normalizedRoomIds);
     return res.status(400).json({
       error: 'Invalid roomId. Must be Firestore rooms document id.',
-      receivedRoomId: roomId
+      receivedRoomIds: normalizedRoomIds
     });
   }
+
+  const batchCount = Math.min(
+    normalizedRoomIds.length,
+    Math.max(1, Number(roomCount) || normalizedRoomIds.length)
+  );
+  const primaryRoomId = normalizedRoomIds[0];
 
   if (!roomType || !customerName || !customerPhone) {
     return res.status(400).json({
@@ -137,14 +148,15 @@ export default async function handler(req, res) {
     });
   }
 
-  // Safely normalize roomId (it is already validated as a non-empty string above)
-  const normalizedRoomId = roomId.trim();
+  // Safely normalize primary room id
+  const normalizedRoomId = primaryRoomId;
 
   // ── Duplicate Payment Protection ───────────────────────────────────────────
   if (admin.apps.length) {
     try {
-      const roomDoc = await admin.firestore().collection('rooms').doc(normalizedRoomId).get();
-      if (roomDoc.exists) {
+      for (const id of normalizedRoomIds) {
+        const roomDoc = await admin.firestore().collection('rooms').doc(id).get();
+        if (!roomDoc.exists) continue;
         const roomData = roomDoc.data();
         if (roomData.paymentStatus === 'paid' && roomData.subscriptionStatus === 'active' && roomData.subscriptionEnd) {
           let endTimeMs;
@@ -157,12 +169,13 @@ export default async function handler(req, res) {
           } else {
             endTimeMs = new Date(roomData.subscriptionEnd).getTime();
           }
-          
+
           if (endTimeMs > Date.now()) {
-            console.warn(`[create-order] Room ${normalizedRoomId} already has an active subscription. Order creation blocked.`);
-            return res.status(409).json({ 
-              error: "Room subscription already active", 
-              subscriptionEnd: roomData.subscriptionEnd 
+            console.warn(`[create-order] Room ${id} already has an active subscription. Order creation blocked.`);
+            return res.status(409).json({
+              error: 'Room subscription already active',
+              roomId: id,
+              subscriptionEnd: roomData.subscriptionEnd
             });
           }
         }
@@ -176,7 +189,7 @@ export default async function handler(req, res) {
   // ── Resolve amount from roomType (server-side — never trust client) ────────
   let amount;
   try {
-    amount = getAmountForRoomType(roomType);
+    amount = getAmountForRoomBatch(roomType, batchCount);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -235,14 +248,16 @@ export default async function handler(req, res) {
 
     try {
       const db = admin.firestore();
-      console.log('[create-order] stored payment roomId:', normalizedRoomId);
+      console.log('[create-order] stored payment roomIds:', normalizedRoomIds);
       await db.collection('payments').doc(order.order_id).set({
         orderId: order.order_id,
         roomId: normalizedRoomId,
+        roomIds: normalizedRoomIds,
+        roomCount: batchCount,
         amount: order.order_amount,
-        status: "created",
+        status: 'created',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        paymentType: "room_subscription"
+        paymentType: 'room_subscription'
       });
       console.log(`[create-order] payment mapping stored`);
     } catch (dbError) {
