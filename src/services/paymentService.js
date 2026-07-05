@@ -15,6 +15,13 @@ function getPaymentReturnOrigin() {
   return origin;
 }
 
+/** Full return URL (same page user started from). */
+export function getPaymentReturnUrl() {
+  const base = getPaymentReturnOrigin();
+  const path = window.location.pathname || '/';
+  return `${base}${path}`;
+}
+
 /**
  * Dynamically load the Cashfree JS SDK script.
  * Caches the promise so the script is only injected once.
@@ -71,8 +78,7 @@ export async function initiatePayment(orderData) {
     },
     body: JSON.stringify({
       ...orderData,
-      // Cashfree production rejects localhost return URLs
-      returnUrl: getPaymentReturnOrigin(),
+      returnUrl: `${getPaymentReturnUrl()}?payment_status=check&order_id={order_id}`,
     }),
   });
 

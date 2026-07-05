@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   Upload,
@@ -19,6 +19,25 @@ import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import ConfirmationModal from './ConfirmationModal.jsx';
 import { ROOM_TYPE_PRICING, SUBSCRIPTION_DURATION_DAYS, MAX_ROOMS_PER_BATCH, getSubscriptionTotal } from '../utils/subscriptionConfig.js';
+import { setAddRoomPaymentFlow } from '../utils/paymentFlow.js';
+import { initiatePayment } from '../services/paymentService.js';
+
+const getPendingSummary = (pendingRoomData) => {
+  if (!pendingRoomData) {
+    return { isBatch: false, roomCount: 1, roomType: '1 RK', title: '', total: 150 };
+  }
+  const isBatch = Array.isArray(pendingRoomData.rooms) && pendingRoomData.rooms.length > 1;
+  const roomCount = isBatch
+    ? Number(pendingRoomData.roomCount ?? pendingRoomData.rooms.length) || pendingRoomData.rooms.length
+    : 1;
+  const roomType = (isBatch ? pendingRoomData.roomType : pendingRoomData.roomType) || '1 RK';
+  const title = isBatch ? pendingRoomData.title : pendingRoomData.title;
+  const unitPrice = ROOM_TYPE_PRICING[roomType] ?? ROOM_TYPE_PRICING['1 RK'];
+  const total = Number.isFinite(pendingRoomData.totalSubscriptionAmount)
+    ? pendingRoomData.totalSubscriptionAmount
+    : getSubscriptionTotal(roomType, roomCount);
+  return { isBatch, roomCount, roomType, title, unitPrice, total };
+};
 
 // Predefined features list
 const AVAILABLE_FEATURES = [
@@ -75,7 +94,7 @@ const CONDITION_OPTIONS = [
   { key: 'entryGateLocked', label: 'Entry gate locked after hours' }
 ];
 
-const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCollectCash }) => {
+const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCollectCash, paymentSuccess, successRoomCount, onPaymentDone }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState(() => initialRoom ? {
     title: initialRoom.title || '',
@@ -130,7 +149,11 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
   const [mapLinkError, setMapLinkError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingRoomData, setPendingRoomData] = useState(null);
-  const [step, setStep] = useState('form');
+  const [step, setStep] = useState(paymentSuccess ? 'success' : 'form');
+
+  useEffect(() => {
+    if (paymentSuccess) setStep('success');
+  }, [paymentSuccess]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -395,24 +418,58 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     setSubmitMessage('');
 
     try {
-      await onAddRoom(pendingRoomData, paymentMethod);
+      const result = await onAddRoom(pendingRoomData, paymentMethod);
+
       if (paymentMethod === 'cash') {
-        const count = pendingRoomData.rooms?.length || 1;
+        const count = result?.savedRooms?.length ?? pendingRoomData.rooms?.length ?? 1;
         setSubmitMessage(
           count > 1
             ? `${count} rooms added and cash payment recorded successfully.`
             : 'Room added and cash payment recorded successfully.'
         );
         setTimeout(() => { onClose(); }, 1500);
+        return;
       }
+
+      const savedRooms = result?.savedRooms;
+      if (!savedRooms?.length) {
+        throw new Error('Failed to save rooms before payment');
+      }
+
+      const summary = getPendingSummary(pendingRoomData);
+      setAddRoomPaymentFlow({
+        path: window.location.pathname,
+        roomCount: savedRooms.length,
+        title: summary.title,
+        roomType: summary.roomType
+      });
+
+      setStep('redirecting');
+
+      const primary = savedRooms[0];
+      await initiatePayment({
+        roomId: primary.id,
+        roomIds: savedRooms.map((r) => r.id),
+        roomCount: savedRooms.length,
+        roomType: primary.roomType || primary.rooms || '1 RK',
+        customerName: result.customerName || 'Nivasi Host',
+        customerEmail: result.customerEmail || 'payments@nivasi.space',
+        customerPhone: primary.contact || '9999999999'
+      });
     } catch (error) {
-      setSubmitMessage(t('errorAddingRoom'));
+      setSubmitMessage(error.message || t('errorAddingRoom'));
       setIsSubmitting(false);
+      setStep('payment');
     } finally {
       if (paymentMethod === 'cash') {
         setPendingRoomData(null);
       }
     }
+  };
+
+  const handlePaymentDone = () => {
+    if (onPaymentDone) onPaymentDone();
+    onClose();
   };
 
   const handleConfirmSubmit = async () => {
@@ -438,29 +495,34 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     }
   };
 
-  const isBatchPending = pendingRoomData?.rooms?.length > 1;
-  const pendingRoomCount = isBatchPending
-    ? pendingRoomData.roomCount
-    : 1;
-  const pendingRoomType = isBatchPending
-    ? pendingRoomData.roomType
-    : pendingRoomData?.roomType;
-  const unitSubscriptionAmount = ROOM_TYPE_PRICING[pendingRoomType || formData.roomType] ?? ROOM_TYPE_PRICING['1 RK'];
+  const pendingSummary = getPendingSummary(pendingRoomData);
+  const {
+    isBatch: isBatchPending,
+    roomCount: pendingRoomCount,
+    roomType: pendingRoomType,
+    unitPrice: unitSubscriptionAmount,
+    total: subscriptionAmount
+  } = pendingSummary;
   const formRoomCount = Math.min(MAX_ROOMS_PER_BATCH, Math.max(1, parseInt(formData.roomCount, 10) || 1));
   const formUnitPrice = ROOM_TYPE_PRICING[formData.roomType] ?? ROOM_TYPE_PRICING['1 RK'];
-  const formTotalSubscription = formUnitPrice * formRoomCount;
-  const subscriptionAmount = isBatchPending
-    ? (pendingRoomData.totalSubscriptionAmount ?? unitSubscriptionAmount * pendingRoomCount)
-    : unitSubscriptionAmount;
+  const formTotalSubscription = getSubscriptionTotal(formData.roomType, formRoomCount);
+
+  const headerTitle = isEdit
+    ? t('editRoom')
+    : step === 'success'
+      ? 'Payment Successful'
+      : step === 'redirecting'
+        ? 'Redirecting to Payment'
+        : step === 'payment'
+          ? 'Subscription Payment'
+          : t('addNewRoom');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {isEdit ? t('editRoom') : step === 'payment' ? 'Subscription Payment' : t('addNewRoom')}
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900">{headerTitle}</h2>
           <Button
             variant="outline"
             size="sm"
@@ -567,6 +629,35 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                 disabled={isSubmitting}
               >
                 {t('cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 'redirecting' && (
+          <div className="p-10 flex flex-col items-center justify-center gap-4 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" />
+            <p className="text-gray-700 font-medium">Redirecting to Cashfree…</p>
+            <p className="text-sm text-gray-500">Complete payment in the next screen. You will return here when done.</p>
+          </div>
+        )}
+
+        {step === 'success' && (
+          <div className="p-6 space-y-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Payment Done</h3>
+              <p className="text-gray-600">
+                {(successRoomCount ?? pendingRoomCount) > 1
+                  ? `${successRoomCount ?? pendingRoomCount} room listings are now active and visible in My Rooms.`
+                  : 'Your room listing subscription is active and visible in My Rooms.'}
+              </p>
+            </div>
+            <div className="flex justify-end pt-2 border-t">
+              <Button type="button" onClick={handlePaymentDone}>
+                Done
               </Button>
             </div>
           </div>

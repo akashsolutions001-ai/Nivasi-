@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { User, Phone, Mail, Building, Save, Loader2, CheckCircle, Users, LogOut, MapPin, Shield } from 'lucide-react';
+import { User, Phone, Mail, Building, Save, Loader2, CheckCircle, Users, LogOut, MapPin, Shield, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
@@ -11,10 +11,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import RoomCard from '../components/RoomCard.jsx';
 import ConfirmationModal from '../components/ConfirmationModal.jsx';
 import InAppToast from '../components/InAppToast.jsx';
-import { initiatePayment } from '../services/paymentService.js';
+import { verifyPayment } from '../services/paymentService.js';
+import { getPaymentFlow, clearPaymentFlow } from '../utils/paymentFlow.js';
+import { isSubscriptionActive, isExpiringSoon } from '../utils/subscriptionConfig.js';
 
 const RoomDetailModal = lazy(() => import('../components/RoomDetailModal.jsx'));
 const AddRoomModal = lazy(() => import('../components/AddRoomModal.jsx'));
+const SubscriptionPaymentModal = lazy(() => import('../components/SubscriptionPaymentModal.jsx'));
 const BookingModal = lazy(() => import('../components/BookingModal.jsx'));
 
 const ModalLoadingSpinner = () => (
@@ -71,6 +74,12 @@ const ProfilePage = () => {
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
     const [editRoom, setEditRoom] = useState(null);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [addRoomPaymentSuccess, setAddRoomPaymentSuccess] = useState(false);
+    const [addRoomSuccessCount, setAddRoomSuccessCount] = useState(1);
+    const [subscriptionPayRoom, setSubscriptionPayRoom] = useState(null);
+    const [subscriptionPaymentSuccess, setSubscriptionPaymentSuccess] = useState(false);
+    const [subscriptionIsRenewal, setSubscriptionIsRenewal] = useState(false);
     const [roomToDelete, setRoomToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [notification, setNotification] = useState({ message: '', type: 'success', isVisible: false, title: '' });
@@ -83,6 +92,42 @@ const ProfilePage = () => {
         email: '',
         gender: ''
     });
+
+    const fetchMyRooms = useCallback(async () => {
+        if (!user?.uid) return;
+        try {
+            const q = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
+            const querySnapshot = await getDocs(q);
+            const rooms = [];
+            const { releasePlatformRoomOwnership } = await import('../services/roomService.js');
+
+            for (const docSnap of querySnapshot.docs) {
+                const data = docSnap.data();
+
+                if (data.addedByAdmin) continue;
+
+                const isLegacyAdminListing =
+                    data.verificationStatus === 'verified' &&
+                    !data.verifiedBy;
+
+                if (isLegacyAdminListing) {
+                    releasePlatformRoomOwnership(docSnap.id).catch((err) =>
+                        console.error('Failed to release platform room ownership:', err)
+                    );
+                    continue;
+                }
+
+                rooms.push({ id: docSnap.id, ...data });
+            }
+            setMyRooms(rooms);
+            return rooms;
+        } catch (error) {
+            console.error('Error fetching user rooms:', error);
+            return [];
+        } finally {
+            setIsLoadingRooms(false);
+        }
+    }, [user?.uid]);
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -129,45 +174,87 @@ const ProfilePage = () => {
             }
         };
 
-        const fetchMyRooms = async () => {
-            if (user?.uid) {
-                try {
-                    const q = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
-                    const querySnapshot = await getDocs(q);
-                    const rooms = [];
-                    const { releasePlatformRoomOwnership } = await import('../services/roomService.js');
+        fetchUserProfile();
+        setIsLoadingRooms(true);
+        fetchMyRooms();
+    }, [user, isAuthenticated, navigate, fetchMyRooms, setSelectedGender]);
 
-                    for (const docSnap of querySnapshot.docs) {
-                        const data = docSnap.data();
+    useEffect(() => {
+        const checkPaymentRedirect = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatusParam = urlParams.get('payment_status');
+            const orderIdParam = urlParams.get('order_id');
 
-                        if (data.addedByAdmin) continue;
+            if (paymentStatusParam !== 'check' || !orderIdParam) return;
 
-                        // Legacy admin listings: auto-verified on create (no verifiedBy)
-                        const isLegacyAdminListing =
-                            data.verificationStatus === 'verified' &&
-                            !data.verifiedBy;
+            window.history.replaceState({}, document.title, window.location.pathname);
 
-                        if (isLegacyAdminListing) {
-                            releasePlatformRoomOwnership(docSnap.id).catch((err) =>
-                                console.error('Failed to release platform room ownership:', err)
-                            );
-                            continue;
-                        }
+            setNotification({
+                message: 'Verifying subscription payment with Cashfree...',
+                type: 'info',
+                isVisible: true,
+                title: 'Verifying Payment'
+            });
 
-                        rooms.push({ id: docSnap.id, ...data });
+            try {
+                const result = await verifyPayment(orderIdParam);
+
+                if (result.success) {
+                    const refreshedRooms = await fetchMyRooms();
+
+                    const flow = getPaymentFlow();
+                    const onPaymentPath = flow?.path === window.location.pathname;
+
+                    if (onPaymentPath && flow?.type === 'subscription') {
+                        clearPaymentFlow();
+                        const updatedRoom = refreshedRooms.find((r) => r.id === flow.roomId);
+                        setSubscriptionPayRoom(
+                            updatedRoom || {
+                                id: flow.roomId,
+                                title: flow.title,
+                                roomType: flow.roomType
+                            }
+                        );
+                        setSubscriptionPaymentSuccess(true);
+                        setSubscriptionIsRenewal(false);
+                        setNotification({ message: '', type: 'success', isVisible: false, title: '' });
+                    } else if (onPaymentPath && flow?.type === 'add_room') {
+                        clearPaymentFlow();
+                        setAddRoomSuccessCount(flow.roomCount || 1);
+                        setAddRoomPaymentSuccess(true);
+                        setShowAddForm(true);
+                        setNotification({ message: '', type: 'success', isVisible: false, title: '' });
+                    } else {
+                        setNotification({
+                            message: 'Your subscription is now active! The listing is visible in My Rooms.',
+                            type: 'success',
+                            isVisible: true,
+                            title: 'Payment Successful!'
+                        });
                     }
-                    setMyRooms(rooms);
-                } catch (error) {
-                    console.error("Error fetching user rooms:", error);
-                } finally {
-                    setIsLoadingRooms(false);
+                } else {
+                    setNotification({
+                        message: `Payment not completed. Status: ${result.orderStatus || 'Pending'}`,
+                        type: 'warning',
+                        isVisible: true,
+                        title: 'Payment Pending'
+                    });
                 }
+            } catch (error) {
+                console.error('Error verifying payment redirect:', error);
+                setNotification({
+                    message: 'Could not verify payment: ' + error.message,
+                    type: 'error',
+                    isVisible: true,
+                    title: 'Verification Error'
+                });
             }
         };
 
-        fetchUserProfile();
-        fetchMyRooms();
-    }, [user, isAuthenticated, navigate]);
+        if (!isLoadingRooms) {
+            checkPaymentRedirect();
+        }
+    }, [isLoadingRooms, fetchMyRooms]);
 
     const handleInputChange = (field, value) => {
         if (field === 'phone') {
@@ -205,6 +292,41 @@ const ProfilePage = () => {
     const handleEditRoom = useCallback((room) => {
         setEditRoom(room);
     }, []);
+
+    const handleAddRoom = useCallback(async (roomData, paymentMethod = 'online') => {
+        const isBatch = roomData?.rooms && Array.isArray(roomData.rooms);
+        const roomsToAdd = isBatch ? roomData.rooms : [roomData];
+
+        try {
+            const { addRoom } = await import('../services/roomService.js');
+            const savedRooms = [];
+
+            for (const room of roomsToAdd) {
+                const savedRoom = await addRoom(room, user, false);
+                savedRooms.push(savedRoom);
+            }
+
+            setMyRooms((prev) => [...savedRooms, ...prev]);
+
+            return {
+                savedRooms,
+                customerName: user?.displayName || 'Nivasi Host',
+                customerEmail: user?.email || 'payments@nivasi.space'
+            };
+        } catch (error) {
+            console.error('Error adding room or initiating payment:', error);
+
+            const isDuplicateError = error.message && error.message.includes('already active');
+
+            setNotification({
+                message: isDuplicateError ? 'Your room subscription is already active.' : 'Failed to save room: ' + error.message,
+                type: isDuplicateError ? 'info' : 'error',
+                isVisible: true,
+                title: isDuplicateError ? 'Subscription Active' : 'Payment Error'
+            });
+            throw error;
+        }
+    }, [user]);
 
     const handleUpdateRoom = useCallback(async (updatedRoom) => {
         try {
@@ -274,32 +396,19 @@ const ProfilePage = () => {
         }
     }, []);
 
-    const handleRenew = useCallback(async (room) => {
-        try {
-            setNotification({
-                message: 'Redirecting to payment for subscription renewal...',
-                type: 'info',
-                isVisible: true,
-                title: 'Redirecting to Payment'
-            });
-            await initiatePayment({
-                roomId: room.id,
-                roomType: room.roomType || room.rooms || '1 RK',
-                customerName: user?.displayName || 'Nivasi Host',
-                customerEmail: user?.email || 'payments@nivasi.space',
-                customerPhone: room.contact || '9999999999'
-            });
-        } catch (error) {
-            console.error('Error initiating payment:', error);
-            const isDuplicate = error.message && error.message.includes('already active');
-            setNotification({
-                message: isDuplicate ? 'Your subscription is already active.' : 'Failed to initiate payment: ' + error.message,
-                type: isDuplicate ? 'info' : 'error',
-                isVisible: true,
-                title: isDuplicate ? 'Subscription Active' : 'Payment Error'
-            });
-        }
-    }, [user]);
+    const openSubscriptionPayment = useCallback((room) => {
+        const isRenewal =
+            room.paymentStatus === 'expired' ||
+            (room.paymentStatus === 'paid' &&
+                (!isSubscriptionActive(room.subscriptionEnd) || isExpiringSoon(room.subscriptionEnd)));
+        setSubscriptionIsRenewal(isRenewal);
+        setSubscriptionPaymentSuccess(false);
+        setSubscriptionPayRoom(room);
+    }, []);
+
+    const handleRenew = useCallback((room) => {
+        openSubscriptionPayment(room);
+    }, [openSubscriptionPayment]);
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -582,10 +691,19 @@ const ProfilePage = () => {
                 {/* My Rooms Section */}
                 {!isOnboarding && (
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden mt-8 p-6 sm:p-8">
-                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                            <Building className="w-6 h-6 text-orange-500" />
-                            My Rooms
-                        </h2>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <Building className="w-6 h-6 text-orange-500" />
+                                My Rooms
+                            </h2>
+                            <Button
+                                onClick={() => setShowAddForm(true)}
+                                className="bg-orange-600 hover:bg-orange-700 text-white w-full sm:w-auto"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Room
+                            </Button>
+                        </div>
                         {isLoadingRooms ? (
                             <div className="flex justify-center py-8">
                                 <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -607,8 +725,15 @@ const ProfilePage = () => {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-8 text-gray-500">
-                                You haven't uploaded any rooms yet.
+                            <div className="text-center py-8">
+                                <p className="text-gray-500 mb-4">You haven&apos;t uploaded any rooms yet.</p>
+                                <Button
+                                    onClick={() => setShowAddForm(true)}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Your First Room
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -630,6 +755,46 @@ const ProfilePage = () => {
                             room={selectedRoomForBooking}
                             onClose={() => { setShowBookingModal(false); setSelectedRoomForBooking(null); }}
                             onSuccess={handleBookingSuccess}
+                        />
+                    </Suspense>
+                )}
+
+                {subscriptionPayRoom && (
+                    <Suspense fallback={<ModalLoadingSpinner />}>
+                        <SubscriptionPaymentModal
+                            room={subscriptionPayRoom}
+                            onClose={() => {
+                                setSubscriptionPayRoom(null);
+                                setSubscriptionPaymentSuccess(false);
+                            }}
+                            customerName={user?.displayName || 'Nivasi Host'}
+                            customerEmail={user?.email || 'payments@nivasi.space'}
+                            paymentSuccess={subscriptionPaymentSuccess}
+                            isRenewal={subscriptionIsRenewal}
+                            onPaymentDone={() => {
+                                setSubscriptionPayRoom(null);
+                                setSubscriptionPaymentSuccess(false);
+                                fetchMyRooms();
+                            }}
+                        />
+                    </Suspense>
+                )}
+
+                {showAddForm && (
+                    <Suspense fallback={<ModalLoadingSpinner />}>
+                        <AddRoomModal
+                            onClose={() => {
+                                setShowAddForm(false);
+                                setAddRoomPaymentSuccess(false);
+                            }}
+                            onAddRoom={handleAddRoom}
+                            isAdmin={false}
+                            paymentSuccess={addRoomPaymentSuccess}
+                            successRoomCount={addRoomSuccessCount}
+                            onPaymentDone={() => {
+                                setShowAddForm(false);
+                                setAddRoomPaymentSuccess(false);
+                            }}
                         />
                     </Suspense>
                 )}

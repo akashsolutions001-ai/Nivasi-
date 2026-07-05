@@ -13,13 +13,15 @@ import { useLanguage } from './contexts/LanguageContext.jsx';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { useUserPreferences } from './contexts/UserPreferencesContext.jsx';
 import './App.css';
-import { isSubscriptionActive } from './utils/subscriptionConfig.js';
-import { initiatePayment, verifyPayment } from './services/paymentService.js';
+import { verifyPayment } from './services/paymentService.js';
+import { getPaymentFlow, clearPaymentFlow } from './utils/paymentFlow.js';
+import { isSubscriptionActive, isExpiringSoon } from './utils/subscriptionConfig.js';
 
 // Lazy load modal components
 const RoomDetailModal = lazy(() => import('./components/RoomDetailModal.jsx'));
 const MessCard = lazy(() => import('./components/MessCard.jsx'));
 const AddRoomModal = lazy(() => import('./components/AddRoomModal.jsx'));
+const SubscriptionPaymentModal = lazy(() => import('./components/SubscriptionPaymentModal.jsx'));
 const AdminLoginModal = lazy(() => import('./components/AdminLoginModal.jsx'));
 const FeatureFilterModal = lazy(() => import('./components/FeatureFilterModal.jsx'));
 const BookingModal = lazy(() => import('./components/BookingModal.jsx'));
@@ -115,6 +117,11 @@ function App() {
   const [roomToToggleHidden, setRoomToToggleHidden] = useState(null);
   const [adminFilter, setAdminFilter] = useState('all');
   const [authPendingAction, setAuthPendingAction] = useState(() => sessionStorage.getItem('nivasi_auth_action') || null);
+  const [addRoomPaymentSuccess, setAddRoomPaymentSuccess] = useState(false);
+  const [addRoomSuccessCount, setAddRoomSuccessCount] = useState(1);
+  const [subscriptionPayRoom, setSubscriptionPayRoom] = useState(null);
+  const [subscriptionPaymentSuccess, setSubscriptionPaymentSuccess] = useState(false);
+  const [subscriptionIsRenewal, setSubscriptionIsRenewal] = useState(false);
 
   // Version log — runs once on mount; helps identify stale cached builds on mobile
   useEffect(() => {
@@ -252,13 +259,9 @@ function App() {
 
 
           if (result.success) {
-            setNotification({
-              message: 'Your subscription is now active! The listing is published and visible to students.',
-              type: 'success',
-              isVisible: true,
-              title: 'Payment Successful!'
-            });
-            
+            const flow = getPaymentFlow();
+            const onPaymentPath = flow?.path === window.location.pathname;
+
             // Reload rooms to get updated status
             const { fetchRooms } = await import('./services/roomService.js');
             const firestoreRooms = await fetchRooms();
@@ -270,7 +273,34 @@ function App() {
               const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
               return !firestoreKeys.has(key);
             });
-            setRooms(deduplicateRooms([...firestoreRooms, ...newStaticRooms]));
+            const allRooms = deduplicateRooms([...firestoreRooms, ...newStaticRooms]);
+            setRooms(allRooms);
+
+            if (onPaymentPath && flow?.type === 'subscription') {
+              clearPaymentFlow();
+              const updatedRoom = allRooms.find((r) => r.id === flow.roomId);
+              setSubscriptionPayRoom(
+                updatedRoom || {
+                  id: flow.roomId,
+                  title: flow.title,
+                  roomType: flow.roomType
+                }
+              );
+              setSubscriptionPaymentSuccess(true);
+              setSubscriptionIsRenewal(false);
+            } else if (onPaymentPath && flow?.type === 'add_room') {
+              clearPaymentFlow();
+              setAddRoomSuccessCount(flow.roomCount || 1);
+              setAddRoomPaymentSuccess(true);
+              setShowAddForm(true);
+            } else {
+              setNotification({
+                message: 'Your subscription is now active! The listing is published and visible to students.',
+                type: 'success',
+                isVisible: true,
+                title: 'Payment Successful!'
+              });
+            }
           } else {
             setNotification({
               message: `Payment not completed. Status: ${result.orderStatus || 'Pending'}`,
@@ -554,32 +584,21 @@ function App() {
           isVisible: true,
           title: 'Cash Payment Recorded'
         });
-        return;
+        return { savedRooms: mergedRooms };
       }
 
       setRooms((prev) => deduplicateRooms([...savedRooms, ...prev]));
-      setShowAddForm(false);
-
-      setNotification({
-        message: 'Redirecting to Cashfree to complete subscription payment...',
-        type: 'info',
-        isVisible: true,
-        title: 'Redirecting to Payment'
-      });
-
-      const primary = savedRooms[0];
-      await initiatePayment({
-        roomId: primary.id,
-        roomIds: savedRooms.map((r) => r.id),
-        roomCount: savedRooms.length,
-        roomType: primary.roomType || primary.rooms || '1 RK',
+      return {
+        savedRooms,
         customerName: user?.displayName || 'Nivasi Host',
-        customerEmail: user?.email || 'payments@nivasi.space',
-        customerPhone: primary.contact || '9999999999'
-      });
+        customerEmail: user?.email || 'payments@nivasi.space'
+      };
     } catch (error) {
       console.error('Error adding room or initiating payment:', error);
-      setShowAddForm(false);
+
+      if (paymentMethod === 'cash') {
+        setShowAddForm(false);
+      }
       
       const isDuplicateError = error.message && error.message.includes('already active');
       
@@ -593,34 +612,19 @@ function App() {
     }
   }, [user, isAdmin, canCollectCash]);
 
-  const handleRenewRoomSubscription = useCallback(async (room) => {
-    try {
-      setNotification({
-        message: 'Redirecting to Cashfree to renew subscription...',
-        type: 'info',
-        isVisible: true,
-        title: 'Redirecting to Payment'
-      });
+  const openSubscriptionPayment = useCallback((room) => {
+    const isRenewal =
+      room.paymentStatus === 'expired' ||
+      (room.paymentStatus === 'paid' &&
+        (!isSubscriptionActive(room.subscriptionEnd) || isExpiringSoon(room.subscriptionEnd)));
+    setSubscriptionIsRenewal(isRenewal);
+    setSubscriptionPaymentSuccess(false);
+    setSubscriptionPayRoom(room);
+  }, []);
 
-      await initiatePayment({
-        roomId: room.id,
-        roomType: room.roomType || room.rooms || '1 RK',
-        customerName: user?.displayName || 'Nivasi Host',
-        customerEmail: user?.email || 'payments@nivasi.space',
-        customerPhone: room.contact || '9999999999'
-      });
-    } catch (error) {
-      console.error('Error renewing subscription:', error);
-      const isDuplicateError = error.message && error.message.includes('already active');
-      
-      setNotification({
-        message: isDuplicateError ? 'Your room subscription is already active.' : 'Failed to initiate renewal: ' + error.message,
-        type: isDuplicateError ? 'info' : 'error',
-        isVisible: true,
-        title: isDuplicateError ? 'Subscription Active' : 'Renewal Error'
-      });
-    }
-  }, [user]);
+  const handleRenewRoomSubscription = useCallback((room) => {
+    openSubscriptionPayment(room);
+  }, [openSubscriptionPayment]);
 
   const handleCashCollectedForRoom = useCallback(async (room) => {
     if (!canCollectCash) return;
@@ -633,12 +637,7 @@ function App() {
           prev.map(r => (r.id === room.id ? { ...r, ...result } : r))
         )
       );
-      setNotification({
-        message: `"${room.title}" subscription marked as paid. Listing is now live.`,
-        type: 'success',
-        isVisible: true,
-        title: 'Cash Payment Recorded'
-      });
+      setSubscriptionPayRoom((prev) => (prev?.id === room.id ? { ...prev, ...result } : prev));
     } catch (error) {
       console.error('Error recording cash payment:', error);
       setNotification({
@@ -647,6 +646,7 @@ function App() {
         isVisible: true,
         title: 'Cash Payment Error'
       });
+      throw error;
     }
   }, [canCollectCash]);
 
@@ -1209,7 +1209,6 @@ function App() {
                       onDelete={() => handleRequestDeleteRoom(room)}
                       onToggleHidden={() => handleRequestToggleHidden(room)}
                       onRenew={() => requireAuth('renew-room', () => handleRenewRoomSubscription(room))}
-                      onCashCollected={() => handleCashCollectedForRoom(room)}
                       onVerify={() => handleVerifyRoom(room)}
                       onReject={() => handleRejectRoom(room)}
                       t={t}
@@ -1255,13 +1254,46 @@ function App() {
       }
 
       {
+        subscriptionPayRoom && (
+          <Suspense fallback={<ModalLoadingSpinner />}>
+            <SubscriptionPaymentModal
+              room={subscriptionPayRoom}
+              onClose={() => {
+                setSubscriptionPayRoom(null);
+                setSubscriptionPaymentSuccess(false);
+              }}
+              canCollectCash={canCollectCash}
+              onCashCollected={handleCashCollectedForRoom}
+              customerName={user?.displayName || 'Nivasi Host'}
+              customerEmail={user?.email || 'payments@nivasi.space'}
+              paymentSuccess={subscriptionPaymentSuccess}
+              isRenewal={subscriptionIsRenewal}
+              onPaymentDone={() => {
+                setSubscriptionPayRoom(null);
+                setSubscriptionPaymentSuccess(false);
+              }}
+            />
+          </Suspense>
+        )
+      }
+
+      {
         showAddForm && (
           <Suspense fallback={<ModalLoadingSpinner />}>
             <AddRoomModal
-              onClose={() => setShowAddForm(false)}
+              onClose={() => {
+                setShowAddForm(false);
+                setAddRoomPaymentSuccess(false);
+              }}
               onAddRoom={handleAddRoom}
               isAdmin={isAdmin}
               canCollectCash={canCollectCash}
+              paymentSuccess={addRoomPaymentSuccess}
+              successRoomCount={addRoomSuccessCount}
+              onPaymentDone={() => {
+                setShowAddForm(false);
+                setAddRoomPaymentSuccess(false);
+              }}
             />
           </Suspense>
         )
