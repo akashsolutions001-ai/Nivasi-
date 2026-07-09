@@ -90,6 +90,29 @@ const deduplicateRooms = (rooms) => {
   return result;
 };
 
+const isFirestoreRoom = (room) => typeof room?.id === 'string' && room.id.trim() !== '';
+const STATIC_DELETED_KEYS = 'nivasi_static_deleted_room_keys';
+const getRoomCompositeKey = (room) =>
+  `${(room?.title || '').toLowerCase().trim()}|${(room?.contact || '').trim()}|${room?.rent}`;
+
+const getDeletedStaticKeys = () => {
+  try {
+    const raw = localStorage.getItem(STATIC_DELETED_KEYS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? new Set(parsed) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const rememberDeletedStaticRoom = (room) => {
+  const key = getRoomCompositeKey(room);
+  if (!key) return;
+  const keys = getDeletedStaticKeys();
+  keys.add(key);
+  localStorage.setItem(STATIC_DELETED_KEYS, JSON.stringify([...keys]));
+};
+
 function App() {
   const { t, currentLanguage } = useLanguage();
   const { user, loading, isAuthenticated } = useAuth();
@@ -122,6 +145,14 @@ function App() {
   const [subscriptionPayRoom, setSubscriptionPayRoom] = useState(null);
   const [subscriptionPaymentSuccess, setSubscriptionPaymentSuccess] = useState(false);
   const [subscriptionIsRenewal, setSubscriptionIsRenewal] = useState(false);
+
+  const materializeStaticRoom = useCallback(async (room) => {
+    if (isFirestoreRoom(room)) return room;
+    const { addRoom } = await import('./services/roomService.js');
+    const migrated = await addRoom(room, user, isAdmin);
+    setRooms(prev => deduplicateRooms(prev.map((r) => (r.id === room.id ? migrated : r))));
+    return migrated;
+  }, [user, isAdmin]);
 
   // Version log — runs once on mount; helps identify stale cached builds on mobile
   useEffect(() => {
@@ -156,6 +187,7 @@ function App() {
 
         // Also load static rooms
         const { sampleRooms } = await import('./data/rooms.js');
+        const deletedStaticKeys = getDeletedStaticKeys();
         console.log(`📦 Loaded ${sampleRooms.length} static rooms from rooms.js`);
 
         // Create a Set of unique identifiers from Firestore rooms to avoid duplicates
@@ -167,7 +199,7 @@ function App() {
         // Filter static rooms that don't already exist in Firestore
         const newStaticRooms = sampleRooms.filter(room => {
           const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
-          return !firestoreKeys.has(key);
+          return !firestoreKeys.has(key) && !deletedStaticKeys.has(key);
         });
 
         console.log(`🆕 ${newStaticRooms.length} static rooms not in Firestore`);
@@ -664,7 +696,8 @@ function App() {
   const handleUpdateRoom = useCallback(async (updatedRoom) => {
     try {
       const { updateRoom } = await import('./services/roomService.js');
-      const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
+      const targetRoom = await materializeStaticRoom(updatedRoom);
+      const savedRoom = await updateRoom(targetRoom.id, { ...updatedRoom, id: targetRoom.id });
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r)));
       console.log('[admin] action completed: room updated');
       setEditRoom(null);
@@ -686,7 +719,7 @@ function App() {
         title: 'Room Updated Locally'
       });
     }
-  }, []);
+  }, [materializeStaticRoom]);
 
   const handleVerifyRoom = useCallback(async (roomToVerify) => {
     try {
@@ -729,10 +762,18 @@ function App() {
     if (!roomToDelete || isDeleting) return;
 
     setIsDeleting(true);
+    let deletedRoomId = roomToDelete.id;
     try {
       const { deleteRoom } = await import('./services/roomService.js');
-      if (roomToDelete.id) {
-        await deleteRoom(roomToDelete.id);
+      let roomForDelete = roomToDelete;
+      if (!isFirestoreRoom(roomForDelete)) {
+        rememberDeletedStaticRoom(roomForDelete);
+        roomForDelete = await materializeStaticRoom(roomForDelete);
+      }
+      deletedRoomId = roomForDelete.id;
+
+      if (deletedRoomId) {
+        await deleteRoom(deletedRoomId);
       }
     } catch (error) {
       console.error('Error deleting room from Firestore (will still remove locally):', error);
@@ -740,8 +781,8 @@ function App() {
       // Only delete by unique Firestore document ID to prevent deleting rooms with similar data
       setRooms(prev => prev.filter(r => {
         // Only remove the room with the exact matching ID
-        if (r.id && roomToDelete.id) {
-          return r.id !== roomToDelete.id;
+        if (r.id && deletedRoomId) {
+          return r.id !== deletedRoomId;
         }
         // If somehow a room has no ID, don't delete it
         return true;
@@ -756,7 +797,7 @@ function App() {
       setIsDeleting(false);
       setRoomToDelete(null);
     }
-  }, [roomToDelete, isDeleting]);
+  }, [roomToDelete, isDeleting, materializeStaticRoom]);
 
   // Handler to request toggle room visibility (opens confirmation modal)
   const handleRequestToggleHidden = useCallback((room) => {
@@ -767,10 +808,11 @@ function App() {
   const handleConfirmToggleHidden = useCallback(async () => {
     if (!isAdmin || !roomToToggleHidden) return;
 
-    const room = roomToToggleHidden;
+    let room = roomToToggleHidden;
 
     try {
       const { updateRoom } = await import('./services/roomService.js');
+      room = await materializeStaticRoom(room);
       const updatedRoom = { ...room, hidden: !room.hidden };
       await updateRoom(room.id, updatedRoom);
 
@@ -798,7 +840,7 @@ function App() {
     } finally {
       setRoomToToggleHidden(null);
     }
-  }, [isAdmin, roomToToggleHidden]);
+  }, [isAdmin, roomToToggleHidden, materializeStaticRoom]);
 
   // Handler to cleanup duplicate rooms from Firestore (Admin only)
   const handleCleanupDuplicates = useCallback(async () => {
