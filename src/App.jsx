@@ -145,6 +145,7 @@ function App() {
   const [subscriptionPayRoom, setSubscriptionPayRoom] = useState(null);
   const [subscriptionPaymentSuccess, setSubscriptionPaymentSuccess] = useState(false);
   const [subscriptionIsRenewal, setSubscriptionIsRenewal] = useState(false);
+  const [isMigratingStaticRooms, setIsMigratingStaticRooms] = useState(false);
 
   const materializeStaticRoom = useCallback(async (room) => {
     if (isFirestoreRoom(room)) return room;
@@ -927,9 +928,10 @@ function App() {
 
   // Handler to migrate static rooms to Firestore (Admin only)
   const handleMigrateToFirestore = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || isMigratingStaticRooms) return;
 
     try {
+      setIsMigratingStaticRooms(true);
       setNotification({
         message: 'Migrating static rooms to Firestore...',
         type: 'info',
@@ -977,7 +979,7 @@ function App() {
           const roomData = { ...room };
           delete roomData.id;
 
-          await addRoom(roomData);
+          await addRoom(roomData, user, true);
           migrated++;
           console.log(`✅ Migrated: ${room.title}`);
         } catch (err) {
@@ -1016,8 +1018,10 @@ function App() {
         isVisible: true,
         title: 'Migration Failed'
       });
+    } finally {
+      setIsMigratingStaticRooms(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, isMigratingStaticRooms, user]);
 
   // Show global loading state for auth initialization
   if (loading) {
@@ -1222,7 +1226,22 @@ function App() {
             </div>
           )}
 
-          {isAdmin && <AdminMetrics rooms={rooms} adminFilter={adminFilter} setAdminFilter={setAdminFilter} />}
+          {isAdmin && (
+            <>
+              <div className="mb-3 flex justify-end">
+                <Button
+                  onClick={handleMigrateToFirestore}
+                  disabled={isMigratingStaticRooms}
+                  variant="outline"
+                  size="sm"
+                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                >
+                  {isMigratingStaticRooms ? 'Migrating Static Rooms...' : 'Migrate Static Rooms to Firestore'}
+                </Button>
+              </div>
+              <AdminMetrics rooms={rooms} adminFilter={adminFilter} setAdminFilter={setAdminFilter} />
+            </>
+          )}
 
           {activeSection === 'rooms' ? (
             <>
