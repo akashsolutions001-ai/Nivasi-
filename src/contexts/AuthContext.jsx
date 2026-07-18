@@ -47,11 +47,8 @@ export const AuthProvider = ({ children }) => {
 
     /* -------------------- REDIRECT HANDLING (LIKE PROJECT 2) -------------------- */
     consumeRedirectResult()
-      .then((result) => {
-        console.log("[auth] redirect result:", result ? "SUCCESS" : "NONE");
-      })
+      .then(() => {})
       .catch((err) => {
-        console.error("[auth] redirect error:", err?.code, err?.message);
         if (err?.code !== "auth/credential-already-in-use") {
           setAuthError(err);
         }

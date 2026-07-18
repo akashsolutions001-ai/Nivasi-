@@ -76,11 +76,6 @@ export const UserPreferencesProvider = ({ children }) => {
 
     useEffect(() => {
         if (isAdmin) {
-            console.log('[admin] admin session active:', {
-                isGlobalAdmin,
-                canCollectCash,
-                adminScope
-            });
             sessionStorage.setItem('isAdmin', 'true');
             if (canCollectCash) {
                 sessionStorage.setItem('canCollectCash', 'true');

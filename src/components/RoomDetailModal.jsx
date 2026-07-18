@@ -112,9 +112,7 @@ const RoomDetailModal = ({ room, onClose }) => {
     setShowBookingModal(true);
   };
 
-  const handleBookingSuccess = (booking) => {
-    console.log('Booking successful:', booking);
-  };
+  const handleBookingSuccess = () => {};
 
   const handleCloseBookingModal = () => {
     setShowBookingModal(false);
@@ -139,8 +137,8 @@ const RoomDetailModal = ({ room, onClose }) => {
       try {
         await navigator.share(shareData);
         setShareMessage(t('sharedSuccessfully'));
-      } catch (err) {
-        console.log('Error sharing:', err);
+      } catch {
+        // User cancelled share — ignore
       }
     } else {
       const shareText = `${shareData.title}\n${shareData.text}\n${shareData.url}\n\n${t('foundOnNivasi')}`;

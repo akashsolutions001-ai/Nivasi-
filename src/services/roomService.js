@@ -56,16 +56,13 @@ export const fetchRooms = async () => {
             
             // Check for subscription expiry
             if (data.subscriptionStatus === 'active' && !isSubscriptionActive(data.subscriptionEnd)) {
-                console.log(`[expiry-check] expired room: ${id}`);
-                console.log(`[expiry-check] room marked expired: ${data.title}`);
-                
                 // Non-blocking update to Firestore
                 const updateRef = doc(db, ROOMS_COLLECTION, id);
                 updateDoc(updateRef, {
                     paymentStatus: 'expired',
                     subscriptionStatus: 'expired',
                     isPublished: false
-                }).catch(e => console.error('[expiry-check] Failed to update Firestore:', e));
+                }).catch(() => {});
                 
                 return { ...data, id, paymentStatus: 'expired', subscriptionStatus: 'expired', isPublished: false };
             }

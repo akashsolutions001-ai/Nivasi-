@@ -58,26 +58,20 @@ if ('serviceWorker' in navigator) {
       updateViaCache: 'none'
     })
       .then((registration) => {
-        console.log('Service Worker registered successfully:', registration.scope);
-
         // Check for updates periodically
         setInterval(() => {
           registration.update();
         }, 60000); // Check every minute
 
-        // Handle updates
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version available
-              console.log('New version of the app is available');
-            }
+            // New version installed — available on next refresh
           });
         });
       })
-      .catch((error) => {
-        console.error('Service Worker registration failed:', error);
+      .catch(() => {
+        // Service worker optional; ignore registration failures
       });
   });
 
@@ -113,18 +107,4 @@ if ('serviceWorker' in navigator) {
     }
   });
 
-  // Handle page show event (for bfcache)
-  window.addEventListener('pageshow', (event) => {
-    if (event.persisted) {
-      // Page was restored from bfcache
-      console.log('Page restored from cache');
-    }
-  });
-
-  // Prevent page from being discarded
-  if ('wasDiscarded' in document) {
-    if (document.wasDiscarded) {
-      console.log('Page was discarded and restored');
-    }
-  }
 }

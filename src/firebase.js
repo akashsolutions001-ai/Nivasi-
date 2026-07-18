@@ -60,14 +60,14 @@ export const consumeRedirectResult = () => {
 // Simple analytics wrapper
 export const analytics = {
   logEvent: (eventName, eventParams = {}) => {
-    // Only log non-sensitive metadata
-    const safeParams = { ...eventParams };
-    delete safeParams.email;
-    delete safeParams.uid;
-    delete safeParams.token;
-    
-    console.log(`[Analytics] ${eventName}`, safeParams);
-    // In the future, this can be wired to actual Firebase Analytics
+    // Placeholder for Firebase Analytics — keep console quiet in production
+    if (import.meta.env.DEV) {
+      const safeParams = { ...eventParams };
+      delete safeParams.email;
+      delete safeParams.uid;
+      delete safeParams.token;
+      console.log(`[Analytics] ${eventName}`, safeParams);
+    }
   }
 };
 

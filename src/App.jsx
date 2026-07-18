@@ -156,27 +156,6 @@ function App() {
     return migrated;
   }, [user, isAdmin]);
 
-  // Version log — runs once on mount; helps identify stale cached builds on mobile
-  useEffect(() => {
-    console.log('APP VERSION:', import.meta.env.VITE_APP_VERSION || 'dev');
-    console.log('BUILD TIME:', new Date().toISOString());
-    console.log('API BASE (env):', import.meta.env.VITE_API_URL || '(not set — will use window.location.origin)');
-  }, []);
-
-  // iOS Debug logging
-  useEffect(() => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      console.log('App: iOS Device - Auth State:', {
-        user: user ? 'exists' : 'null',
-        loading,
-        isAuthenticated
-      });
-    }
-  }, [user, loading, isAuthenticated]);
-
-
-
   // Load rooms data from Firestore AND static data (merged, avoiding duplicates)
   useEffect(() => {
     const loadRooms = async () => {
@@ -185,12 +164,9 @@ function App() {
         const { fetchRooms } = await import('./services/roomService.js');
         const firestoreRooms = await fetchRooms();
 
-        console.log(`📊 Fetched ${firestoreRooms.length} rooms from Firestore`);
-
         // Also load static rooms
         const { sampleRooms } = await import('./data/rooms.js');
         const deletedStaticKeys = getDeletedStaticKeys();
-        console.log(`📦 Loaded ${sampleRooms.length} static rooms from rooms.js`);
 
         // Create a Set of unique identifiers from Firestore rooms to avoid duplicates
         // Use title + contact + rent as a composite key
@@ -204,27 +180,18 @@ function App() {
           return !firestoreKeys.has(key) && !deletedStaticKeys.has(key);
         });
 
-        console.log(`🆕 ${newStaticRooms.length} static rooms not in Firestore`);
-
         // Merge: Firestore rooms take priority, then add non-duplicate static rooms
         const allRooms = [...firestoreRooms, ...newStaticRooms];
 
         // Final deduplication by ID
         const dedupedRooms = deduplicateRooms(allRooms);
 
-        console.log(`📋 Final room count: ${dedupedRooms.length} rooms`);
-
         setRooms(dedupedRooms);
-
-        if (dedupedRooms.length === 0) {
-          console.log('No rooms found. Add rooms via the admin panel.');
-        }
       } catch (error) {
         console.error('Failed to load rooms:', error);
         // Fallback to static data only if Firestore fails
         try {
           const { sampleRooms } = await import('./data/rooms.js');
-          console.log(`📦 Fallback: Loaded ${sampleRooms.length} static rooms`);
           setRooms(sampleRooms);
         } catch (staticError) {
           console.error('Failed to load static rooms:', staticError);
@@ -754,7 +721,6 @@ function App() {
       const targetRoom = await materializeStaticRoom(payload);
       const savedRoom = await updateRoom(targetRoom.id, { ...payload, id: targetRoom.id });
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r)));
-      console.log('[admin] action completed: room updated');
       setEditRoom(null);
       setNotification({
         message: 'Your room listing has been updated with the new details.',
@@ -782,7 +748,6 @@ function App() {
       const { verifyRoom } = await import('./services/roomService.js');
       await verifyRoom(roomToVerify.id, user?.uid || 'admin');
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToVerify.id ? { ...r, verificationStatus: 'verified' } : r)));
-      console.log('[admin] action completed: room verified');
       setNotification({
         message: 'The room has been verified successfully.',
         type: 'success',
@@ -848,7 +813,6 @@ function App() {
         // If somehow a room has no ID, don't delete it
         return true;
       }));
-      console.log('[admin] action completed: room deleted');
       setNotification({
         message: 'The room has been removed from the listings.',
         type: 'success',
@@ -882,7 +846,6 @@ function App() {
       await updateRoom(room.id, updatedRoom);
 
       setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
-      console.log('[admin] action completed: room visibility toggled');
       setNotification({
         message: room.hidden
           ? 'Room is now visible to all users.'

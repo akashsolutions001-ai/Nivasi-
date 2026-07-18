@@ -125,14 +125,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
                 loading={isFirst ? "eager" : 'lazy'}
                 decoding="sync"
                 onError={e => {
-                  console.error(`Failed to load image: ${primaryImage}`, e);
-                  console.error('Room data:', room);
                   e.target.style.display = 'none';
-                }}
-                onLoad={() => {
-                  if (isFirst) {
-                    console.log(`Successfully loaded critical image: ${primaryImage}`);
-                  }
                 }}
               />
             </div>

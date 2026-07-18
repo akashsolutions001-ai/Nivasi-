@@ -52,8 +52,6 @@ export const saveUserOnGenderSelection = async (gender, additionalData = {}) => 
         ...additionalData
       });
 
-      console.log('User gender updated successfully');
-
       return {
         ...existingUser,
         gender: gender,
@@ -76,7 +74,6 @@ export const saveUserOnGenderSelection = async (gender, additionalData = {}) => 
 
       const docRef = await addDoc(collection(db, USERS_COLLECTION), userData);
 
-      console.log('User saved successfully with ID:', docRef.id);
 
       return {
         id: docRef.id,
@@ -134,8 +131,6 @@ export const updateUserGender = async (uid, gender) => {
       lastUpdated: serverTimestamp(),
       lastActive: serverTimestamp()
     });
-
-    console.log('User gender updated successfully');
 
     return {
       ...user,
@@ -196,8 +191,6 @@ export const saveUserLocation = async (locationData) => {
         lastActive: serverTimestamp()
       });
 
-      console.log('User location updated successfully');
-
       return {
         ...existingUser,
         city: locationData.city,
@@ -219,8 +212,6 @@ export const saveUserLocation = async (locationData) => {
       };
 
       const docRef = await addDoc(collection(db, USERS_COLLECTION), userData);
-
-      console.log('User location saved successfully with ID:', docRef.id);
 
       return {
         id: docRef.id,
