@@ -17,7 +17,7 @@ import { authenticateAdmin } from '../utils/adminConfig.js';
 const AdminLoginPage = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { setAdminSession } = useUserPreferences();
+  const { setAdminSession, setSelectedLocation } = useUserPreferences();
   
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,12 +35,17 @@ const AdminLoginPage = () => {
 
     const adminSession = authenticateAdmin(password);
     if (adminSession) {
-      setAdminSession(true, adminSession.canCollectCash);
+      setAdminSession(true, adminSession);
+      if (!adminSession.isGlobalAdmin && adminSession.adminScope) {
+        setSelectedLocation(adminSession.adminScope);
+      }
       setNotification({
-        message: 'You now have access to admin features.',
+        message: adminSession.isGlobalAdmin
+          ? 'Global admin mode activated. You can manage rooms for all colleges.'
+          : `College admin mode activated for ${adminSession.adminScope?.college || 'your college'}.`,
         type: 'success',
         isVisible: true,
-        title: 'Admin Mode Activated!'
+        title: adminSession.isGlobalAdmin ? 'Global Admin Activated!' : 'College Admin Activated!'
       });
       // Delay navigation slightly so user sees the toast
       setTimeout(() => {

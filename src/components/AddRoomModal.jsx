@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Upload,
@@ -21,6 +21,7 @@ import ConfirmationModal from './ConfirmationModal.jsx';
 import { ROOM_TYPE_PRICING, SUBSCRIPTION_DURATION_DAYS, MAX_ROOMS_PER_BATCH, getSubscriptionTotal } from '../utils/subscriptionConfig.js';
 import { setAddRoomPaymentFlow } from '../utils/paymentFlow.js';
 import { initiatePayment } from '../services/paymentService.js';
+import { CITIES, DEFAULT_PLATFORM_CITY, DEFAULT_PLATFORM_COLLEGE, ROOM_STUDENT_STREAMS, DEFAULT_STUDENT_STREAM, getCollegesForCity } from '../utils/locationOptions.js';
 
 const getPendingSummary = (pendingRoomData) => {
   if (!pendingRoomData) {
@@ -94,7 +95,7 @@ const CONDITION_OPTIONS = [
   { key: 'entryGateLocked', label: 'Entry gate locked after hours' }
 ];
 
-const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCollectCash, paymentSuccess, successRoomCount, onPaymentDone }) => {
+const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCollectCash, lockedLocation, paymentSuccess, successRoomCount, onPaymentDone }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState(() => initialRoom ? {
     title: initialRoom.title || '',
@@ -103,8 +104,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     address: initialRoom.address || '',
     location: initialRoom.location || '',
     mapLink: initialRoom.mapLink || '',
-    city: initialRoom.city || '',
-    college: initialRoom.college || '',
+    city: lockedLocation?.city || initialRoom.city || DEFAULT_PLATFORM_CITY,
+    college: lockedLocation?.college || initialRoom.college || DEFAULT_PLATFORM_COLLEGE,
+    studentStream: lockedLocation?.studentStream || initialRoom.studentStream || DEFAULT_STUDENT_STREAM,
     note: initialRoom.note || '',
     description: initialRoom.description || '',
     selectedFeatures: initialRoom.features || [],
@@ -125,8 +127,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     address: '',
     location: '',
     mapLink: '',
-    city: '',
-    college: '',
+    city: lockedLocation?.city || DEFAULT_PLATFORM_CITY,
+    college: lockedLocation?.college || DEFAULT_PLATFORM_COLLEGE,
+    studentStream: lockedLocation?.studentStream || DEFAULT_STUDENT_STREAM,
     note: '',
     description: '',
     selectedFeatures: [],
@@ -157,17 +160,29 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      // Reset college when stream or city changes so list stays valid
+      if (name === 'studentStream' || name === 'city') {
+        next.college = '';
+      }
+      return next;
+    });
 
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    if (name === 'studentStream' || name === 'city') {
+      setErrors(prev => ({ ...prev, college: '' }));
+    }
     if (name === 'mapLink' && mapLinkError) setMapLinkError('');
   };
+
+  const collegesForForm = useMemo(
+    () => getCollegesForCity(formData.city, formData.studentStream),
+    [formData.city, formData.studentStream]
+  );
 
   const handleFeatureToggle = (feature) => {
     setFormData(prev => {
@@ -268,6 +283,18 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       newErrors.mapLink = t('validMapLink');
     }
 
+    if (!formData.city.trim()) {
+      newErrors.city = 'City is required';
+    }
+
+    if (!formData.college.trim()) {
+      newErrors.college = 'College is required';
+    }
+
+    if (!formData.studentStream) {
+      newErrors.studentStream = 'Please select Engineering or Medical students';
+    }
+
     if (!formData.gender) {
       newErrors.gender = t('genderRequired');
     }
@@ -349,8 +376,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       address: formData.address.trim(),
       location: formData.location.trim(),
       mapLink: formData.mapLink.trim(),
-      city: formData.city.trim() || undefined,
-      college: formData.college.trim() || undefined,
+      city: formData.city.trim(),
+      college: formData.college.trim(),
+      studentStream: formData.studentStream || DEFAULT_STUDENT_STREAM,
       roomType: formData.roomType,
       rooms: formData.roomType,
       description: description || '',
@@ -912,29 +940,83 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
               </div>
             </div>
 
-            {/* City and College (optional) */}
+            {/* Student stream first — drives college list */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Room for *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {ROOM_STUDENT_STREAMS.map((stream) => (
+                  <label
+                    key={stream.value}
+                    className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all text-center ${formData.studentStream === stream.value
+                      ? 'border-orange-500 bg-orange-50 text-orange-800'
+                      : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="studentStream"
+                      value={stream.value}
+                      checked={formData.studentStream === stream.value}
+                      onChange={handleInputChange}
+                      disabled={!!lockedLocation}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-semibold">{stream.label}</span>
+                  </label>
+                ))}
+              </div>
+              {errors.studentStream && (
+                <p className="text-red-500 text-sm mt-1">{errors.studentStream}</p>
+              )}
+            </div>
+
+            {/* City and College (college list depends on stream + city) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">City (optional)</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-2">City *</label>
+                <select
                   name="city"
                   value={formData.city}
                   onChange={handleInputChange}
-                  placeholder="e.g. Kolhapur"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  disabled={!!lockedLocation}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.city ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Select city</option>
+                  {CITIES.map((city) => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                  {formData.city && !CITIES.includes(formData.city) && (
+                    <option value={formData.city}>{formData.city}</option>
+                  )}
+                </select>
+                {errors.city && (
+                  <p className="text-red-500 text-sm mt-1">{errors.city}</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">College (optional)</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-2">College *</label>
+                <select
                   name="college"
                   value={formData.college}
                   onChange={handleInputChange}
-                  placeholder="e.g. DYPSN Kolhapur"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  disabled={!!lockedLocation || !formData.city}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.college ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">
+                    {!formData.city ? 'Select city first' : 'Select college'}
+                  </option>
+                  {collegesForForm.map((college) => (
+                    <option key={college} value={college}>{college}</option>
+                  ))}
+                  {formData.college && !collegesForForm.includes(formData.college) && (
+                    <option value={formData.college}>{formData.college}</option>
+                  )}
+                </select>
+                {errors.college && (
+                  <p className="text-red-500 text-sm mt-1">{errors.college}</p>
+                )}
               </div>
             </div>
 

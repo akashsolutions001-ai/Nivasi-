@@ -1,39 +1,93 @@
 import React from 'react';
-import { Home, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Home, CheckCircle, Clock, AlertCircle, MapPin, Building2 } from 'lucide-react';
 import { isSubscriptionActive } from '../utils/subscriptionConfig.js';
+import { roomMatchesUserLocation, DEFAULT_PLATFORM_CITY } from '../utils/locationOptions.js';
 
-const AdminMetrics = ({ rooms, adminFilter, setAdminFilter }) => {
-  // Calculate room metrics directly from props
-  const roomMetrics = React.useMemo(() => {
-    let active = 0;
-    let pending = 0;
-    let expired = 0;
-    let verifiedRooms = 0;
-    let pendingVerification = 0;
+function computeSubMetrics(roomList) {
+  let active = 0;
+  let pending = 0;
+  let expired = 0;
+  let verifiedRooms = 0;
+  let pendingVerification = 0;
 
-    rooms.forEach(room => {
-      // Verification metrics
-      if (room.verificationStatus === 'verified') {
-        verifiedRooms++;
-      } else if (room.verificationStatus === 'pending') {
-        pendingVerification++;
-      }
+  roomList.forEach((room) => {
+    if (room.verificationStatus === 'verified') {
+      verifiedRooms++;
+    } else if (room.verificationStatus === 'pending') {
+      pendingVerification++;
+    }
 
-      // Subscription metrics
-      const hasSub = room.subscriptionStatus !== undefined;
-      if (!hasSub) return;
-      
-      if (room.paymentStatus === 'pending') {
-        pending++;
-      } else if (room.paymentStatus === 'paid' && isSubscriptionActive(room.subscriptionEnd)) {
-        active++;
-      } else if (room.paymentStatus === 'expired' || (room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd))) {
-        expired++;
-      }
+    const hasSub = room.subscriptionStatus !== undefined;
+    if (!hasSub) return;
+
+    if (room.paymentStatus === 'pending') {
+      pending++;
+    } else if (room.paymentStatus === 'paid' && isSubscriptionActive(room.subscriptionEnd)) {
+      active++;
+    } else if (
+      room.paymentStatus === 'expired' ||
+      (room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd))
+    ) {
+      expired++;
+    }
+  });
+
+  return { total: roomList.length, active, pending, expired, verifiedRooms, pendingVerification };
+}
+
+const MetricButton = ({ active, onClick, activeClass, idleClass, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`p-3 rounded-lg border transition-all text-left ${active ? activeClass : idleClass}`}
+  >
+    {children}
+  </button>
+);
+
+const AdminMetrics = ({
+  rooms,
+  adminFilter,
+  setAdminFilter,
+  isGlobalAdmin,
+  adminScope,
+  selectedLocation
+}) => {
+  const metrics = React.useMemo(() => {
+    const allRooms = rooms || [];
+
+    if (!isGlobalAdmin && adminScope) {
+      const collegeRooms = allRooms.filter((room) => roomMatchesUserLocation(room, adminScope));
+      return {
+        mode: 'college',
+        ...computeSubMetrics(collegeRooms),
+        collegeLabel: adminScope.college,
+        cityLabel: adminScope.city
+      };
+    }
+
+    const city = selectedLocation?.city || DEFAULT_PLATFORM_CITY;
+    const college = selectedLocation?.college || null;
+
+    const cityRooms = allRooms.filter((room) => {
+      const roomCity = (room.city || DEFAULT_PLATFORM_CITY).toLowerCase().trim();
+      return roomCity === city.toLowerCase().trim();
     });
 
-    return { total: rooms.length, active, pending, expired, verifiedRooms, pendingVerification };
-  }, [rooms]);
+    const collegeRooms = college
+      ? allRooms.filter((room) => roomMatchesUserLocation(room, { city, college }))
+      : cityRooms;
+
+    return {
+      mode: 'global',
+      platformTotal: allRooms.length,
+      cityTotal: cityRooms.length,
+      collegeTotal: collegeRooms.length,
+      cityLabel: city,
+      collegeLabel: college,
+      ...computeSubMetrics(collegeRooms)
+    };
+  }, [rooms, isGlobalAdmin, adminScope, selectedLocation]);
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
@@ -41,66 +95,108 @@ const AdminMetrics = ({ rooms, adminFilter, setAdminFilter }) => {
         <Home className="w-5 h-5 text-orange-500" />
         Admin Dashboard
       </h2>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* Room Status Filter Buttons */}
-        <button 
-          onClick={() => setAdminFilter('all')}
-          className={`p-3 rounded-lg border transition-all text-left ${adminFilter === 'all' ? 'bg-gray-100 border-gray-400 shadow-inner' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
-        >
-          <p className="text-xs font-semibold text-gray-500 mb-1">Total Rooms</p>
-          <p className="text-xl font-bold text-gray-800">{roomMetrics.total}</p>
-        </button>
 
-        <button 
+      {metrics.mode === 'global' && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div className="p-3 rounded-lg border bg-gray-50 border-gray-200 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
+              <Home className="w-3 h-3" /> Total Rooms (Platform)
+            </p>
+            <p className="text-xl font-bold text-gray-800">{metrics.platformTotal}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-sky-50 border-sky-200 text-left">
+            <p className="text-xs font-semibold text-sky-600 mb-1 flex items-center gap-1">
+              <MapPin className="w-3 h-3" /> In {metrics.cityLabel}
+            </p>
+            <p className="text-xl font-bold text-sky-800">{metrics.cityTotal}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-violet-50 border-violet-200 text-left">
+            <p className="text-xs font-semibold text-violet-600 mb-1 flex items-center gap-1">
+              <Building2 className="w-3 h-3" /> Selected College
+            </p>
+            <p className="text-xl font-bold text-violet-800">{metrics.collegeTotal}</p>
+            {metrics.collegeLabel && (
+              <p className="text-[10px] text-violet-500 mt-1 line-clamp-2">{metrics.collegeLabel}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 ${metrics.mode === 'global' ? 'lg:grid-cols-5' : 'lg:grid-cols-6'}`}>
+        <MetricButton
+          active={adminFilter === 'all'}
+          onClick={() => setAdminFilter('all')}
+          activeClass="bg-gray-100 border-gray-400 shadow-inner"
+          idleClass="bg-gray-50 border-gray-200 hover:bg-gray-100"
+        >
+          <p className="text-xs font-semibold text-gray-500 mb-1">
+            {metrics.mode === 'college' ? 'Total Rooms (College)' : 'College Rooms'}
+          </p>
+          <p className="text-xl font-bold text-gray-800">{metrics.total}</p>
+          {metrics.mode === 'college' && metrics.collegeLabel && (
+            <p className="text-[10px] text-gray-500 mt-1 line-clamp-2">{metrics.collegeLabel}</p>
+          )}
+        </MetricButton>
+
+        <MetricButton
+          active={adminFilter === 'verifiedRooms'}
           onClick={() => setAdminFilter('verifiedRooms')}
-          className={`p-3 rounded-lg border transition-all text-left ${adminFilter === 'verifiedRooms' ? 'bg-emerald-100 border-emerald-400 shadow-inner' : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100'}`}
+          activeClass="bg-emerald-100 border-emerald-400 shadow-inner"
+          idleClass="bg-emerald-50 border-emerald-200 hover:bg-emerald-100"
         >
           <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1 mb-1">
             <CheckCircle className="w-3 h-3" /> Verified
           </p>
-          <p className="text-xl font-bold text-emerald-800">{roomMetrics.verifiedRooms}</p>
-        </button>
+          <p className="text-xl font-bold text-emerald-800">{metrics.verifiedRooms}</p>
+        </MetricButton>
 
-        <button 
+        <MetricButton
+          active={adminFilter === 'pendingVerification'}
           onClick={() => setAdminFilter('pendingVerification')}
-          className={`p-3 rounded-lg border transition-all text-left ${adminFilter === 'pendingVerification' ? 'bg-amber-100 border-amber-400 shadow-inner' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'}`}
+          activeClass="bg-amber-100 border-amber-400 shadow-inner"
+          idleClass="bg-amber-50 border-amber-200 hover:bg-amber-100"
         >
           <p className="text-xs font-semibold text-amber-600 flex items-center gap-1 mb-1">
             <Clock className="w-3 h-3" /> Pending Ver.
           </p>
-          <p className="text-xl font-bold text-amber-800">{roomMetrics.pendingVerification}</p>
-        </button>
+          <p className="text-xl font-bold text-amber-800">{metrics.pendingVerification}</p>
+        </MetricButton>
 
-        <button 
+        <MetricButton
+          active={adminFilter === 'active'}
           onClick={() => setAdminFilter('active')}
-          className={`p-3 rounded-lg border transition-all text-left ${adminFilter === 'active' ? 'bg-blue-100 border-blue-400 shadow-inner' : 'bg-blue-50 border-blue-200 hover:bg-blue-100'}`}
+          activeClass="bg-blue-100 border-blue-400 shadow-inner"
+          idleClass="bg-blue-50 border-blue-200 hover:bg-blue-100"
         >
           <p className="text-xs font-semibold text-blue-600 flex items-center gap-1 mb-1">
             <CheckCircle className="w-3 h-3" /> Active Subs
           </p>
-          <p className="text-xl font-bold text-blue-800">{roomMetrics.active}</p>
-        </button>
+          <p className="text-xl font-bold text-blue-800">{metrics.active}</p>
+        </MetricButton>
 
-        <button 
+        <MetricButton
+          active={adminFilter === 'pending'}
           onClick={() => setAdminFilter('pending')}
-          className={`p-3 rounded-lg border transition-all text-left ${adminFilter === 'pending' ? 'bg-orange-100 border-orange-400 shadow-inner' : 'bg-orange-50 border-orange-200 hover:bg-orange-100'}`}
+          activeClass="bg-orange-100 border-orange-400 shadow-inner"
+          idleClass="bg-orange-50 border-orange-200 hover:bg-orange-100"
         >
           <p className="text-xs font-semibold text-orange-600 flex items-center gap-1 mb-1">
             <Clock className="w-3 h-3" /> Pending Subs
           </p>
-          <p className="text-xl font-bold text-orange-800">{roomMetrics.pending}</p>
-        </button>
+          <p className="text-xl font-bold text-orange-800">{metrics.pending}</p>
+        </MetricButton>
 
-        <button 
+        <MetricButton
+          active={adminFilter === 'expired'}
           onClick={() => setAdminFilter('expired')}
-          className={`p-3 rounded-lg border transition-all text-left ${adminFilter === 'expired' ? 'bg-red-100 border-red-400 shadow-inner' : 'bg-red-50 border-red-200 hover:bg-red-100'}`}
+          activeClass="bg-red-100 border-red-400 shadow-inner"
+          idleClass="bg-red-50 border-red-200 hover:bg-red-100"
         >
           <p className="text-xs font-semibold text-red-600 flex items-center gap-1 mb-1">
             <AlertCircle className="w-3 h-3" /> Expired Subs
           </p>
-          <p className="text-xl font-bold text-red-800">{roomMetrics.expired}</p>
-        </button>
+          <p className="text-xl font-bold text-red-800">{metrics.expired}</p>
+        </MetricButton>
       </div>
     </div>
   );

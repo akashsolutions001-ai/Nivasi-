@@ -1,46 +1,33 @@
 import { useState } from 'react';
-import { MapPin, Building, Loader2, ChevronDown } from 'lucide-react';
+import { MapPin, Building, Loader2, ChevronDown, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { useUserPreferences } from '../contexts/UserPreferencesContext.jsx';
 import { saveUserLocation } from '../services/userService.js';
+import { CITIES, STUDENT_STREAMS, getCollegesForCity } from '../utils/locationOptions.js';
 
 const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClose }) => {
   const { t } = useLanguage();
+  const { selectedStudentStream, setSelectedStudentStream } = useUserPreferences();
+  const [selectedStream, setSelectedStream] = useState(selectedStudentStream || '');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
 
-  // Available cities and their colleges
-  const citiesAndColleges = {
-    'Kolhapur': [
-      "Dr. D. Y. Patil Prathisthan's College of Engineering, Salokhenagar (DYPSN) Kolhapur",
-      "Shivaji University, Kolhapur",
-      "Government College of Engineering, Kolhapur",
-      "KIT's College of Engineering, Kolhapur",
-      "Other College in Kolhapur"
-    ],
-    'Mumbai': [
-      "Mumbai University",
-      "IIT Bombay",
-      "Other College in Mumbai"
-    ],
-    'Pune': [
-      "Pune University",
-      "COEP Pune",
-      "Other College in Pune"
-    ],
-    'Other': [
-      "Other College"
-    ]
-  };
+  const availableColleges =
+    selectedCity && selectedStream ? getCollegesForCity(selectedCity, selectedStream) : [];
 
-  const availableCities = Object.keys(citiesAndColleges);
+  const handleStreamSelect = (stream) => {
+    setSelectedStream(stream);
+    setSelectedCollege('');
+    setShowCollegeDropdown(false);
+  };
 
   const handleCitySelect = (city) => {
     setSelectedCity(city);
-    setSelectedCollege(''); // Reset college when city changes
+    setSelectedCollege('');
     setShowCollegeDropdown(false);
   };
 
@@ -50,8 +37,8 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
   };
 
   const handleContinue = async () => {
-    if (!selectedCity || !selectedCollege) {
-      setError('Please select both city and college');
+    if (!selectedStream || !selectedCity || !selectedCollege) {
+      setError('Please select stream, city and college');
       return;
     }
 
@@ -59,16 +46,18 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
       setIsSaving(true);
       setError(null);
 
-      // Save location data to Firebase
       await saveUserLocation({
         city: selectedCity,
-        college: selectedCollege
+        college: selectedCollege,
+        studentStream: selectedStream
       });
 
-      // Pass the selected location data to parent component
+      setSelectedStudentStream(selectedStream);
+
       onLocationSelect({
         city: selectedCity,
-        college: selectedCollege
+        college: selectedCollege,
+        studentStream: selectedStream
       });
     } catch (error) {
       console.error('Error saving location:', error);
@@ -80,7 +69,7 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-slide-up">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-slide-up max-h-[90vh] overflow-y-auto">
         <div className="text-center mb-8">
           <div className="flex justify-between items-start">
             <div className="flex-1">
@@ -91,7 +80,7 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
                 {isUpdateMode ? (t('changeLocation') || 'Change Location') : (t('selectYourLocation') || 'Select Your Location')}
               </h2>
               <p className="text-gray-600">
-                {t('selectCityAndCollege') || 'Please select your city and college to continue'}
+                Select stream, city and college to continue
               </p>
             </div>
             {onClose && (
@@ -108,31 +97,53 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
         </div>
 
         <div className="space-y-6">
-          {/* City Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              {t('city') || 'City'} *
+              I am a *
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              {availableCities.map((city) => (
+            <div className="grid grid-cols-1 gap-3">
+              {STUDENT_STREAMS.map((stream) => (
                 <Button
-                  key={city}
-                  onClick={() => handleCitySelect(city)}
-                  className={`h-12 text-sm font-semibold rounded-xl transition-all duration-200 ${selectedCity === city
-                    ? 'bg-gray-900 hover:bg-gray-800 text-white scale-105'
+                  key={stream.value}
+                  onClick={() => handleStreamSelect(stream.value)}
+                  className={`h-12 text-sm font-semibold rounded-xl transition-all duration-200 ${selectedStream === stream.value
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
                     : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-2 border-gray-200 hover:border-gray-300'
                     }`}
-                  variant={selectedCity === city ? 'default' : 'outline'}
+                  variant={selectedStream === stream.value ? 'default' : 'outline'}
                 >
-                  <MapPin className="w-4 h-4 mr-2" />
-                  {city}
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  {stream.label}
                 </Button>
               ))}
             </div>
           </div>
 
-          {/* College Selection */}
-          {selectedCity && (
+          {selectedStream && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                {t('city') || 'City'} *
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {CITIES.map((city) => (
+                  <Button
+                    key={city}
+                    onClick={() => handleCitySelect(city)}
+                    className={`h-12 text-sm font-semibold rounded-xl transition-all duration-200 ${selectedCity === city
+                      ? 'bg-gray-900 hover:bg-gray-800 text-white scale-105'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-2 border-gray-200 hover:border-gray-300'
+                      }`}
+                    variant={selectedCity === city ? 'default' : 'outline'}
+                  >
+                    <MapPin className="w-4 h-4 mr-2" />
+                    {city}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedStream && selectedCity && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 {t('college') || 'College'} *
@@ -157,7 +168,7 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
 
                 {showCollegeDropdown && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {citiesAndColleges[selectedCity].map((college) => (
+                    {availableColleges.map((college) => (
                       <button
                         key={college}
                         onClick={() => handleCollegeSelect(college)}
@@ -175,17 +186,15 @@ const LocationSelectionModal = ({ onLocationSelect, isUpdateMode = false, onClos
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm text-center">{error}</p>
             </div>
           )}
 
-          {/* Continue Button */}
           <Button
             onClick={handleContinue}
-            disabled={!selectedCity || !selectedCollege || isSaving}
+            disabled={!selectedStream || !selectedCity || !selectedCollege || isSaving}
             className="w-full h-12 text-lg font-semibold rounded-xl transition-all duration-200 bg-gray-900 hover:bg-gray-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? (

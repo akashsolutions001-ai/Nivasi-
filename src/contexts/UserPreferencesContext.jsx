@@ -10,13 +10,25 @@ export const useUserPreferences = () => {
     return context;
 };
 
+const readAdminScope = () => {
+    try {
+        const raw = sessionStorage.getItem('adminScope');
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+
 export const UserPreferencesProvider = ({ children }) => {
     const [selectedGender, setSelectedGender] = useState(() => {
         return localStorage.getItem('userGender');
     });
 
+    const [selectedStudentStream, setSelectedStudentStream] = useState(() => {
+        return localStorage.getItem('userStudentStream') || null;
+    });
+
     const [selectedLocation, setSelectedLocation] = useState(() => {
-        // Initialize from localStorage if available
         const saved = localStorage.getItem('userLocation');
         return saved ? JSON.parse(saved) : null;
     });
@@ -33,33 +45,95 @@ export const UserPreferencesProvider = ({ children }) => {
         return sessionStorage.getItem('canCollectCash') === 'true';
     });
 
-    const setAdminSession = (active, cashCollection = false) => {
-        setIsAdmin(active);
-        setCanCollectCash(active && cashCollection);
+    const [isGlobalAdmin, setIsGlobalAdmin] = useState(() => {
+        return sessionStorage.getItem('isGlobalAdmin') === 'true';
+    });
+
+    const [adminScope, setAdminScope] = useState(() => readAdminScope());
+
+    /**
+     * @param {boolean} active
+     * @param {boolean|{ canCollectCash?: boolean, isGlobalAdmin?: boolean, adminScope?: object|null }} sessionOrCash
+     */
+    const setAdminSession = (active, sessionOrCash = {}) => {
+        const session =
+            typeof sessionOrCash === 'boolean'
+                ? { canCollectCash: sessionOrCash, isGlobalAdmin: !!sessionOrCash, adminScope: null }
+                : (sessionOrCash || {});
+
+        setIsAdmin(!!active);
+        if (!active) {
+            setCanCollectCash(false);
+            setIsGlobalAdmin(false);
+            setAdminScope(null);
+            return;
+        }
+
+        setCanCollectCash(!!session.canCollectCash);
+        setIsGlobalAdmin(!!session.isGlobalAdmin);
+        setAdminScope(session.isGlobalAdmin ? null : (session.adminScope || null));
     };
 
     useEffect(() => {
         if (isAdmin) {
-            console.log('[admin] admin session active: preserving admin mode');
+            console.log('[admin] admin session active:', {
+                isGlobalAdmin,
+                canCollectCash,
+                adminScope
+            });
             sessionStorage.setItem('isAdmin', 'true');
             if (canCollectCash) {
                 sessionStorage.setItem('canCollectCash', 'true');
             } else {
                 sessionStorage.removeItem('canCollectCash');
             }
+            if (isGlobalAdmin) {
+                sessionStorage.setItem('isGlobalAdmin', 'true');
+                sessionStorage.removeItem('adminScope');
+            } else {
+                sessionStorage.removeItem('isGlobalAdmin');
+                if (adminScope) {
+                    sessionStorage.setItem('adminScope', JSON.stringify(adminScope));
+                } else {
+                    sessionStorage.removeItem('adminScope');
+                }
+            }
         } else {
             sessionStorage.removeItem('isAdmin');
             sessionStorage.removeItem('canCollectCash');
+            sessionStorage.removeItem('isGlobalAdmin');
+            sessionStorage.removeItem('adminScope');
             setCanCollectCash(false);
+            setIsGlobalAdmin(false);
+            setAdminScope(null);
         }
-    }, [isAdmin, canCollectCash]);
+    }, [isAdmin, canCollectCash, isGlobalAdmin, adminScope]);
 
-    // Persist changes to localStorage
+    // College admins stay locked to their college location for filtering
+    useEffect(() => {
+        if (isAdmin && !isGlobalAdmin && adminScope?.city && adminScope?.college) {
+            setSelectedLocation({
+                city: adminScope.city,
+                college: adminScope.college,
+                studentStream: adminScope.studentStream
+            });
+            if (adminScope.studentStream) {
+                setSelectedStudentStream(adminScope.studentStream);
+            }
+        }
+    }, [isAdmin, isGlobalAdmin, adminScope, setSelectedLocation, setSelectedStudentStream]);
+
     useEffect(() => {
         if (selectedGender) {
             localStorage.setItem('userGender', selectedGender);
         }
     }, [selectedGender]);
+
+    useEffect(() => {
+        if (selectedStudentStream) {
+            localStorage.setItem('userStudentStream', selectedStudentStream);
+        }
+    }, [selectedStudentStream]);
 
     useEffect(() => {
         if (selectedLocation) {
@@ -73,10 +147,11 @@ export const UserPreferencesProvider = ({ children }) => {
         }
     }, [hasAcceptedTerms]);
 
-
     const value = {
         selectedGender,
         setSelectedGender,
+        selectedStudentStream,
+        setSelectedStudentStream,
         selectedLocation,
         setSelectedLocation,
         hasAcceptedTerms,
@@ -85,6 +160,8 @@ export const UserPreferencesProvider = ({ children }) => {
         setIsAdmin,
         canCollectCash,
         setCanCollectCash,
+        isGlobalAdmin,
+        adminScope,
         setAdminSession
     };
 

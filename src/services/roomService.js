@@ -332,6 +332,47 @@ export const deleteRoom = async (roomId) => {
 };
 
 /**
+ * Assign all Firestore rooms to a college and city (platform-wide).
+ */
+export const assignAllRoomsToCollege = async (
+  college = "Dr. D. Y. Patil Prathisthan's College of Engineering, Salokhenagar (DYPSN) Kolhapur",
+  city = 'Kolhapur'
+) => {
+  try {
+    const roomsRef = collection(db, ROOMS_COLLECTION);
+    const snapshot = await getDocs(roomsRef);
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      if (data.college === college && data.city === city) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        await updateDoc(doc(db, ROOMS_COLLECTION, docSnap.id), {
+          college,
+          city,
+          updatedAt: serverTimestamp()
+        });
+        updated++;
+      } catch (err) {
+        failed++;
+        console.error(`Failed to assign college for room ${docSnap.id}:`, err);
+      }
+    }
+
+    return { total: snapshot.size, updated, skipped, failed, college, city };
+  } catch (error) {
+    console.error('Error assigning rooms to college:', error);
+    throw error;
+  }
+};
+
+/**
  * Initialize Firestore with rooms from static data (one-time migration)
  */
 export const migrateRoomsToFirestore = async (staticRooms) => {

@@ -35,8 +35,12 @@ const Layout = () => {
         setSelectedLocation,
         selectedGender,
         setSelectedGender,
+        setSelectedStudentStream,
         hasAcceptedTerms,
-        setHasAcceptedTerms
+        setHasAcceptedTerms,
+        isAdmin,
+        isGlobalAdmin,
+        adminScope
     } = useUserPreferences();
 
     // Modal Visibility State
@@ -122,8 +126,19 @@ const Layout = () => {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
                     if (userDoc.exists()) {
                         const data = userDoc.data();
+                        // Keep city/college filter in sync with saved profile
+                        // Do not overwrite locked college-admin scope
+                        if (data.city && data.college && !(isAdmin && !isGlobalAdmin && adminScope)) {
+                            setSelectedLocation((prev) => {
+                                if (prev?.city === data.city && prev?.college === data.college) return prev;
+                                return { city: data.city, college: data.college };
+                            });
+                        }
+                        if (data.studentStream && !(isAdmin && !isGlobalAdmin && adminScope)) {
+                            setSelectedStudentStream(data.studentStream);
+                        }
                         // Check if critical fields are missing
-                        if (!data.phone || !data.college) {
+                        if (!data.phone || !data.college || !data.studentStream) {
                             // Only redirect if not already there
                             navigate('/profile?onboarding=true');
                         }
@@ -140,7 +155,7 @@ const Layout = () => {
         // Run check after a short delay to ensure auth is settled
         const timer = setTimeout(checkProfile, 2000);
         return () => clearTimeout(timer);
-    }, [isAuthenticated, user, location.pathname, navigate]);
+    }, [isAuthenticated, user, location.pathname, navigate, setSelectedLocation, setSelectedStudentStream, isAdmin, isGlobalAdmin, adminScope]);
 
 
     return (

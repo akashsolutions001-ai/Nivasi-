@@ -15,12 +15,24 @@ const Header = ({
     onShowBookingManagement
 }) => {
     const { t } = useLanguage();
-    const { selectedLocation, selectedGender, isAdmin, setAdminSession } = useUserPreferences();
+    const { selectedLocation, selectedGender, isAdmin, isGlobalAdmin, adminScope, setAdminSession } = useUserPreferences();
     const navigate = useNavigate();
 
     const handleAdminLogout = () => {
         setAdminSession(false);
     };
+
+    const handleLocationClick = () => {
+        if (isAdmin && !isGlobalAdmin && adminScope) {
+            return; // College admin location is locked
+        }
+        if (onChangeLocation) onChangeLocation();
+    };
+
+    const adminLabel = isGlobalAdmin
+        ? 'Global Admin'
+        : (adminScope?.city ? `${adminScope.city} Admin` : (t('adminMode') || 'Admin Mode'));
+
 
     return (
         <header className="header-gradient text-white shadow-lg sticky top-0 z-40">
@@ -57,9 +69,10 @@ const Header = ({
                     <div className="grid grid-cols-2 gap-2">
                         {/* Location */}
                         <Button
-                            onClick={onChangeLocation}
+                            onClick={handleLocationClick}
                             variant="outline"
-                            className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5"
+                            disabled={isAdmin && !isGlobalAdmin}
+                            className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-80"
                         >
                             <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
                             <span className="truncate">{selectedLocation ? selectedLocation.city : 'City'}</span>
@@ -94,7 +107,7 @@ const Header = ({
                         <div className="mt-2 grid grid-cols-2 gap-2">
                             <div className="col-span-2 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-white/20 border border-white/30 text-white text-xs font-semibold">
                                 <Shield className="w-3.5 h-3.5" />
-                                {t('adminMode')}
+                                {adminLabel}
                             </div>
                             <Button
                                 variant="outline"
@@ -134,12 +147,15 @@ const Header = ({
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 w-full sm:w-auto mt-2 sm:mt-0">
                         <LanguageSelector />
                         <Button
-                            onClick={onChangeLocation}
+                            onClick={handleLocationClick}
                             variant="outline"
-                            className="w-full sm:w-auto bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
+                            disabled={isAdmin && !isGlobalAdmin}
+                            className="w-full sm:w-auto bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm disabled:opacity-80"
                         >
                             <Settings className="w-4 h-4 mr-2" />
-                            {selectedLocation ? 'Change City' : 'City'}
+                            {isAdmin && !isGlobalAdmin
+                              ? (selectedLocation?.city || 'City')
+                              : (selectedLocation ? 'Change City' : 'City')}
                         </Button>
                         <Button
                             onClick={onChangeGender}
@@ -155,7 +171,7 @@ const Header = ({
                             <>
                                 <div className="status-badge status-admin animate-fade-scale w-full sm:w-auto text-center">
                                     <Shield className="w-4 h-4 mr-1" />
-                                    {t('adminMode')}
+                                    {adminLabel}
                                 </div>
                                 <Button
                                     variant="outline"

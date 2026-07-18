@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { User, Phone, Mail, Building, Save, Loader2, CheckCircle, Users, LogOut, MapPin, Shield, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
@@ -14,6 +14,7 @@ import InAppToast from '../components/InAppToast.jsx';
 import { verifyPayment } from '../services/paymentService.js';
 import { getPaymentFlow, clearPaymentFlow } from '../utils/paymentFlow.js';
 import { isSubscriptionActive, isExpiringSoon } from '../utils/subscriptionConfig.js';
+import { CITIES, STUDENT_STREAMS, getCollegesForCity } from '../utils/locationOptions.js';
 
 const RoomDetailModal = lazy(() => import('../components/RoomDetailModal.jsx'));
 const AddRoomModal = lazy(() => import('../components/AddRoomModal.jsx'));
@@ -29,36 +30,9 @@ const ModalLoadingSpinner = () => (
   </div>
 );
 
-// List of colleges
-const COLLEGES = [
-    "Dr. D. Y. Patil Prathisthan's College of Engineering, Salokhenagar (DYPSN) Kolhapur",
-    "Shivaji University, Kolhapur",
-    "KIT's College of Engineering, Kolhapur",
-    "Rajarambapu Institute of Technology, Islampur",
-    "Bharati Vidyapeeth's College of Engineering, Kolhapur",
-    "D. Y. Patil College of Engineering and Technology, Kolhapur",
-    "Sanjay Ghodawat University, Kolhapur",
-    "DKTE's Textile and Engineering Institute, Ichalkaranji",
-    "Annasaheb Dange College of Engineering, Ashta",
-    "Padmabhooshan Vasantraodada Patil Institute of Technology, Sangli",
-    "Other"
-];
-
-// List of cities
-const CITIES = [
-    "Kolhapur",
-    "Sangli",
-    "Ichalkaranji",
-    "Islampur",
-    "Satara",
-    "Miraj",
-    "Karad",
-    "Other"
-];
-
 const ProfilePage = () => {
     const { user, isAuthenticated } = useAuth();
-    const { setSelectedGender } = useUserPreferences();
+    const { setSelectedGender, setSelectedLocation, setSelectedStudentStream } = useUserPreferences();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const isOnboarding = searchParams.get('onboarding') === 'true';
@@ -90,7 +64,8 @@ const ProfilePage = () => {
         college: '',
         city: '',
         email: '',
-        gender: ''
+        gender: '',
+        studentStream: ''
     });
 
     const fetchMyRooms = useCallback(async () => {
@@ -149,11 +124,18 @@ const ProfilePage = () => {
                             phone: data.phone || '',
                             college: data.college || '',
                             city: data.city || '',
-                            gender: data.gender || ''
+                            gender: data.gender || '',
+                            studentStream: data.studentStream || ''
                         });
-                        // Sync gender with UserPreferences for room filtering
+                        // Sync gender + location with UserPreferences for room filtering
                         if (data.gender) {
                             setSelectedGender(data.gender);
+                        }
+                        if (data.studentStream) {
+                            setSelectedStudentStream(data.studentStream);
+                        }
+                        if (data.city && data.college) {
+                            setSelectedLocation({ city: data.city, college: data.college });
                         }
                     } else {
                         // Initialize with auth data
@@ -163,7 +145,8 @@ const ProfilePage = () => {
                             phone: '',
                             college: '',
                             city: '',
-                            gender: ''
+                            gender: '',
+                            studentStream: ''
                         });
                     }
                 } catch (error) {
@@ -261,11 +244,18 @@ const ProfilePage = () => {
             // Only allow numbers
             const cleanValue = value.replace(/\D/g, '').slice(0, 10);
             setFormData(prev => ({ ...prev, [field]: cleanValue }));
+        } else if (field === 'studentStream' || field === 'city') {
+            setFormData(prev => ({ ...prev, [field]: value, college: '' }));
         } else {
             setFormData(prev => ({ ...prev, [field]: value }));
         }
         setSaveSuccess(false);
     };
+
+    const collegesForProfile = useMemo(
+        () => getCollegesForCity(formData.city, formData.studentStream),
+        [formData.city, formData.studentStream]
+    );
 
     // ── Room action handlers ──────────────────────────────────────────────
 
@@ -443,6 +433,10 @@ const ProfilePage = () => {
             alert("Please select your gender");
             return;
         }
+        if (!formData.studentStream) {
+            alert("Please select Engineering Student or Medical Student");
+            return;
+        }
 
         setIsSaving(true);
         setSaveSuccess(false);
@@ -456,11 +450,17 @@ const ProfilePage = () => {
                 college: formData.college,
                 city: formData.city,
                 gender: formData.gender,
+                studentStream: formData.studentStream,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
 
-            // Sync gender with UserPreferences context for room filtering
+            // Sync gender + location with UserPreferences for room filtering
             setSelectedGender(formData.gender);
+            setSelectedStudentStream(formData.studentStream);
+            setSelectedLocation({
+                city: formData.city,
+                college: formData.college
+            });
 
             setSaveSuccess(true);
 
@@ -610,6 +610,33 @@ const ProfilePage = () => {
                                     </div>
                                 </div>
 
+                                {/* Student Stream */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="studentStream" className="text-gray-700">I am a *</Label>
+                                    <div className="relative">
+                                        <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
+                                        <select
+                                            id="studentStream"
+                                            value={formData.studentStream}
+                                            onChange={(e) => handleInputChange('studentStream', e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:border-orange-500 focus:ring-2 focus:ring-orange-500 focus:ring-opacity-20 outline-none bg-white appearance-none cursor-pointer"
+                                            required
+                                        >
+                                            <option value="">Select stream</option>
+                                            {STUDENT_STREAMS.map((stream) => (
+                                                <option key={stream.value} value={stream.value}>
+                                                    {stream.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* City Selection */}
                                 <div className="space-y-2">
                                     <Label htmlFor="city" className="text-gray-700">City *</Label>
@@ -648,13 +675,23 @@ const ProfilePage = () => {
                                             onChange={(e) => handleInputChange('college', e.target.value)}
                                             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:border-orange-500 focus:ring-2 focus:ring-orange-500 focus:ring-opacity-20 outline-none bg-white appearance-none cursor-pointer"
                                             required
+                                            disabled={!formData.studentStream || !formData.city}
                                         >
-                                            <option value="">Select your college</option>
-                                            {COLLEGES.map((college, index) => (
+                                            <option value="">
+                                                {!formData.studentStream
+                                                    ? 'Select stream first'
+                                                    : !formData.city
+                                                        ? 'Select city first'
+                                                        : 'Select your college'}
+                                            </option>
+                                            {collegesForProfile.map((college, index) => (
                                                 <option key={index} value={college}>
                                                     {college}
                                                 </option>
                                             ))}
+                                            {formData.college && !collegesForProfile.includes(formData.college) && (
+                                                <option value={formData.college}>{formData.college}</option>
+                                            )}
                                         </select>
                                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

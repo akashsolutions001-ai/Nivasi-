@@ -16,6 +16,8 @@ import './App.css';
 import { verifyPayment } from './services/paymentService.js';
 import { getPaymentFlow, clearPaymentFlow } from './utils/paymentFlow.js';
 import { isSubscriptionActive, isExpiringSoon } from './utils/subscriptionConfig.js';
+import { roomMatchesUserLocation, roomMatchesStudentStream } from './utils/locationOptions.js';
+import { adminCanManageRoom } from './utils/adminConfig.js';
 
 // Lazy load modal components
 const RoomDetailModal = lazy(() => import('./components/RoomDetailModal.jsx'));
@@ -116,7 +118,7 @@ const rememberDeletedStaticRoom = (room) => {
 function App() {
   const { t, currentLanguage } = useLanguage();
   const { user, loading, isAuthenticated } = useAuth();
-  const { selectedGender, selectedLocation, isAdmin, setAdminSession, canCollectCash } = useUserPreferences();
+  const { selectedGender, selectedStudentStream, selectedLocation, setSelectedLocation, isAdmin, setAdminSession, canCollectCash, isGlobalAdmin, adminScope } = useUserPreferences();
 
   const [rooms, setRooms] = useState([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
@@ -145,7 +147,6 @@ function App() {
   const [subscriptionPayRoom, setSubscriptionPayRoom] = useState(null);
   const [subscriptionPaymentSuccess, setSubscriptionPaymentSuccess] = useState(false);
   const [subscriptionIsRenewal, setSubscriptionIsRenewal] = useState(false);
-  const [isMigratingStaticRooms, setIsMigratingStaticRooms] = useState(false);
 
   const materializeStaticRoom = useCallback(async (room) => {
     if (isFirestoreRoom(room)) return room;
@@ -520,6 +521,19 @@ function App() {
           matchesGender = roomGender === selectedGender.toLowerCase();
         }
       }
+
+      // City + college filtering for all users (including admins).
+      // College-scoped admins are locked to their assigned college rooms.
+      let matchesLocation = true;
+      if (isAdmin && !isGlobalAdmin && adminScope) {
+        matchesLocation = roomMatchesUserLocation(room, adminScope);
+      } else {
+        matchesLocation = roomMatchesUserLocation(room, selectedLocation);
+      }
+
+      // Engineering vs Medical separation (admins see all streams)
+      const matchesStream = isAdmin || roomMatchesStudentStream(room, selectedStudentStream);
+
       const matchesCategory = roomMatchesCategory(room, category);
       const matchesSearch = room.title && room.title.toLowerCase().includes(search.toLowerCase());
       const matchesPrice = room.rent ? room.rent <= maxPrice : true;
@@ -533,9 +547,9 @@ function App() {
           );
         });
 
-      return matchesGender && matchesCategory && matchesSearch && matchesFeatures && matchesPrice;
+      return matchesGender && matchesLocation && matchesStream && matchesCategory && matchesSearch && matchesFeatures && matchesPrice;
     });
-  }, [rooms, selectedGender, category, search, featureFilters, roomMatchesCategory, maxPrice, isAdmin, adminFilter]);
+  }, [rooms, selectedGender, selectedStudentStream, selectedLocation, category, search, featureFilters, roomMatchesCategory, maxPrice, isAdmin, isGlobalAdmin, adminScope, adminFilter]);
 
   // AuthGuard Interceptor
   const requireAuth = useCallback((actionStr, callback) => {
@@ -573,23 +587,36 @@ function App() {
 
   const handleAdminLogin = useCallback((adminSession = {}) => {
     requireAuth('admin', () => {
-      setAdminSession(true, adminSession.canCollectCash);
+      setAdminSession(true, adminSession);
+      if (!adminSession.isGlobalAdmin && adminSession.adminScope) {
+        setSelectedLocation(adminSession.adminScope);
+      }
       setShowAdminLogin(false);
       setShowAddForm(true);
       setNotification({
-        message: adminSession.canCollectCash
-          ? 'Admin mode activated with cash collection access.'
-          : 'You now have access to add, edit, and delete rooms.',
+        message: adminSession.isGlobalAdmin
+          ? 'Global admin mode activated. You can manage rooms for all colleges.'
+          : `College admin mode activated for ${adminSession.adminScope?.college || 'your college'} (${adminSession.adminScope?.city || ''}${adminSession.adminScope?.studentStream ? ` · ${adminSession.adminScope.studentStream}` : ''}).`,
         type: 'success',
         isVisible: true,
-        title: 'Admin Mode Activated!'
+        title: adminSession.isGlobalAdmin ? 'Global Admin Activated!' : 'College Admin Activated!'
       });
     });
-  }, [setAdminSession, requireAuth]);
+  }, [setAdminSession, setSelectedLocation, requireAuth]);
 
   const handleAddRoom = useCallback(async (roomData, paymentMethod = 'online') => {
     const isBatch = roomData?.rooms && Array.isArray(roomData.rooms);
-    const roomsToAdd = isBatch ? roomData.rooms : [roomData];
+    let roomsToAdd = isBatch ? roomData.rooms : [roomData];
+
+    // College admins can only create rooms for their assigned college/city/stream
+    if (isAdmin && !isGlobalAdmin && adminScope) {
+      roomsToAdd = roomsToAdd.map((room) => ({
+        ...room,
+        city: adminScope.city,
+        college: adminScope.college,
+        studentStream: adminScope.studentStream || room.studentStream || 'engineering'
+      }));
+    }
 
     try {
       const { addRoom, activateCashSubscriptionForRooms } = await import('./services/roomService.js');
@@ -643,7 +670,19 @@ function App() {
       });
       throw error;
     }
-  }, [user, isAdmin, canCollectCash]);
+  }, [user, isAdmin, isGlobalAdmin, adminScope, canCollectCash]);
+
+  const assertAdminCanManageRoom = useCallback((room) => {
+    if (!isAdmin) return true;
+    if (adminCanManageRoom(room, { isAdmin, isGlobalAdmin, adminScope })) return true;
+    setNotification({
+      message: 'You can only manage rooms for your assigned college.',
+      type: 'error',
+      isVisible: true,
+      title: 'Not Allowed'
+    });
+    return false;
+  }, [isAdmin, isGlobalAdmin, adminScope]);
 
   const openSubscriptionPayment = useCallback((room) => {
     const isRenewal =
@@ -661,6 +700,7 @@ function App() {
 
   const handleCashCollectedForRoom = useCallback(async (room) => {
     if (!canCollectCash) return;
+    if (!assertAdminCanManageRoom(room)) return;
 
     try {
       const { activateCashSubscription } = await import('./services/roomService.js');
@@ -681,7 +721,7 @@ function App() {
       });
       throw error;
     }
-  }, [canCollectCash]);
+  }, [canCollectCash, assertAdminCanManageRoom]);
 
   const handleBookingSuccess = useCallback(() => {
     setShowBookingModal(false);
@@ -695,10 +735,24 @@ function App() {
   }, [t]);
 
   const handleUpdateRoom = useCallback(async (updatedRoom) => {
+    if (!assertAdminCanManageRoom(updatedRoom)) {
+      setEditRoom(null);
+      return;
+    }
+
     try {
       const { updateRoom } = await import('./services/roomService.js');
-      const targetRoom = await materializeStaticRoom(updatedRoom);
-      const savedRoom = await updateRoom(targetRoom.id, { ...updatedRoom, id: targetRoom.id });
+      let payload = { ...updatedRoom };
+      if (isAdmin && !isGlobalAdmin && adminScope) {
+        payload = {
+          ...payload,
+          city: adminScope.city,
+          college: adminScope.college,
+          studentStream: adminScope.studentStream || payload.studentStream || 'engineering'
+        };
+      }
+      const targetRoom = await materializeStaticRoom(payload);
+      const savedRoom = await updateRoom(targetRoom.id, { ...payload, id: targetRoom.id });
       setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r)));
       console.log('[admin] action completed: room updated');
       setEditRoom(null);
@@ -720,9 +774,10 @@ function App() {
         title: 'Room Updated Locally'
       });
     }
-  }, [materializeStaticRoom]);
+  }, [materializeStaticRoom, assertAdminCanManageRoom, isAdmin, isGlobalAdmin, adminScope]);
 
   const handleVerifyRoom = useCallback(async (roomToVerify) => {
+    if (!assertAdminCanManageRoom(roomToVerify)) return;
     try {
       const { verifyRoom } = await import('./services/roomService.js');
       await verifyRoom(roomToVerify.id, user?.uid || 'admin');
@@ -737,9 +792,10 @@ function App() {
     } catch (error) {
       console.error('Error verifying room:', error);
     }
-  }, [user]);
+  }, [user, assertAdminCanManageRoom]);
 
   const handleRejectRoom = useCallback(async (roomToReject) => {
+    if (!assertAdminCanManageRoom(roomToReject)) return;
     try {
       const { rejectRoom } = await import('./services/roomService.js');
       await rejectRoom(roomToReject.id, user?.uid || 'admin');
@@ -753,7 +809,7 @@ function App() {
     } catch (error) {
       console.error('Error rejecting room:', error);
     }
-  }, [user]);
+  }, [user, assertAdminCanManageRoom]);
 
   const handleRequestDeleteRoom = useCallback((room) => {
     setRoomToDelete(room);
@@ -761,6 +817,10 @@ function App() {
 
   const handleConfirmDeleteRoom = useCallback(async () => {
     if (!roomToDelete || isDeleting) return;
+    if (!assertAdminCanManageRoom(roomToDelete)) {
+      setRoomToDelete(null);
+      return;
+    }
 
     setIsDeleting(true);
     let deletedRoomId = roomToDelete.id;
@@ -798,7 +858,7 @@ function App() {
       setIsDeleting(false);
       setRoomToDelete(null);
     }
-  }, [roomToDelete, isDeleting, materializeStaticRoom]);
+  }, [roomToDelete, isDeleting, materializeStaticRoom, assertAdminCanManageRoom]);
 
   // Handler to request toggle room visibility (opens confirmation modal)
   const handleRequestToggleHidden = useCallback((room) => {
@@ -808,6 +868,10 @@ function App() {
   // Handler to confirm toggle room visibility (Admin only)
   const handleConfirmToggleHidden = useCallback(async () => {
     if (!isAdmin || !roomToToggleHidden) return;
+    if (!assertAdminCanManageRoom(roomToToggleHidden)) {
+      setRoomToToggleHidden(null);
+      return;
+    }
 
     let room = roomToToggleHidden;
 
@@ -841,11 +905,11 @@ function App() {
     } finally {
       setRoomToToggleHidden(null);
     }
-  }, [isAdmin, roomToToggleHidden, materializeStaticRoom]);
+  }, [isAdmin, roomToToggleHidden, materializeStaticRoom, assertAdminCanManageRoom]);
 
   // Handler to cleanup duplicate rooms from Firestore (Admin only)
   const handleCleanupDuplicates = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isGlobalAdmin) return;
 
     try {
       setNotification({
@@ -887,11 +951,11 @@ function App() {
         title: 'Cleanup Failed'
       });
     }
-  }, [isAdmin]);
+  }, [isGlobalAdmin]);
 
   // Handler to debug rooms - list all rooms by owner (Admin only)
   const handleDebugRooms = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isGlobalAdmin) return;
 
     try {
       setNotification({
@@ -924,104 +988,7 @@ function App() {
         title: 'Debug Failed'
       });
     }
-  }, [isAdmin]);
-
-  // Handler to migrate static rooms to Firestore (Admin only)
-  const handleMigrateToFirestore = useCallback(async () => {
-    if (!isAdmin || isMigratingStaticRooms) return;
-
-    try {
-      setIsMigratingStaticRooms(true);
-      setNotification({
-        message: 'Migrating static rooms to Firestore...',
-        type: 'info',
-        isVisible: true,
-        title: 'Migration Started'
-      });
-
-      // Load static rooms
-      const { sampleRooms } = await import('./data/rooms.js');
-      const { fetchRooms, addRoom } = await import('./services/roomService.js');
-
-      // Get existing rooms from Firestore
-      const existingRooms = await fetchRooms();
-
-      // Create a Set of unique identifiers from existing Firestore rooms
-      const existingKeys = new Set(
-        existingRooms.map(r => `${(r.title || '').toLowerCase().trim()}|${(r.contact || '').trim()}|${r.rent}`)
-      );
-
-      // Filter static rooms that don't already exist in Firestore
-      const roomsToMigrate = sampleRooms.filter(room => {
-        const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
-        return !existingKeys.has(key);
-      });
-
-      console.log(`📦 Found ${roomsToMigrate.length} rooms to migrate out of ${sampleRooms.length} static rooms`);
-
-      if (roomsToMigrate.length === 0) {
-        setNotification({
-          message: 'All static rooms are already in Firestore!',
-          type: 'success',
-          isVisible: true,
-          title: 'Already Migrated'
-        });
-        return;
-      }
-
-      // Migrate rooms one by one
-      let migrated = 0;
-      let failed = 0;
-
-      for (const room of roomsToMigrate) {
-        try {
-          // Remove the local numeric ID so Firestore generates a new one
-          const roomData = { ...room };
-          delete roomData.id;
-
-          await addRoom(roomData, user, true);
-          migrated++;
-          console.log(`✅ Migrated: ${room.title}`);
-        } catch (err) {
-          failed++;
-          console.error(`❌ Failed to migrate: ${room.title}`, err);
-        }
-      }
-
-      // Reload rooms after migration
-      const freshRooms = await fetchRooms();
-      const { sampleRooms: latestStaticRooms } = await import('./data/rooms.js');
-
-      // Merge with remaining static rooms (in case some weren't migrated)
-      const firestoreKeys = new Set(
-        freshRooms.map(r => `${(r.title || '').toLowerCase().trim()}|${(r.contact || '').trim()}|${r.rent}`)
-      );
-      const remainingStatic = latestStaticRooms.filter(room => {
-        const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
-        return !firestoreKeys.has(key);
-      });
-
-      setRooms(deduplicateRooms([...freshRooms, ...remainingStatic]));
-
-      setNotification({
-        message: `Successfully migrated ${migrated} rooms to Firestore.${failed > 0 ? ` ${failed} failed.` : ''}`,
-        type: failed > 0 ? 'warning' : 'success',
-        isVisible: true,
-        title: 'Migration Complete!'
-      });
-
-    } catch (error) {
-      console.error('Error migrating rooms:', error);
-      setNotification({
-        message: 'Failed to migrate rooms. Check console for details.',
-        type: 'error',
-        isVisible: true,
-        title: 'Migration Failed'
-      });
-    } finally {
-      setIsMigratingStaticRooms(false);
-    }
-  }, [isAdmin, isMigratingStaticRooms, user]);
+  }, [isGlobalAdmin]);
 
   // Show global loading state for auth initialization
   if (loading) {
@@ -1228,18 +1195,19 @@ function App() {
 
           {isAdmin && (
             <>
-              <div className="mb-3 flex justify-end">
-                <Button
-                  onClick={handleMigrateToFirestore}
-                  disabled={isMigratingStaticRooms}
-                  variant="outline"
-                  size="sm"
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                >
-                  {isMigratingStaticRooms ? 'Migrating Static Rooms...' : 'Migrate Static Rooms to Firestore'}
-                </Button>
-              </div>
-              <AdminMetrics rooms={rooms} adminFilter={adminFilter} setAdminFilter={setAdminFilter} />
+              {!isGlobalAdmin && adminScope && (
+                <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                  College admin scope: <strong>{adminScope.college}</strong> · {adminScope.city}
+                </div>
+              )}
+              <AdminMetrics
+                rooms={rooms}
+                adminFilter={adminFilter}
+                setAdminFilter={setAdminFilter}
+                isGlobalAdmin={isGlobalAdmin}
+                adminScope={adminScope}
+                selectedLocation={selectedLocation}
+              />
             </>
           )}
 
@@ -1282,7 +1250,16 @@ function App() {
                     <Search className="w-8 h-8 text-orange-400" />
                   </div>
                   <h3 className="text-lg font-bold text-gray-900 mb-2">No Rooms Found</h3>
-                  <p className="text-gray-500 mb-6">Try adjusting your filters or search query.</p>
+                  <p className="text-gray-500 mb-6">
+                    {(() => {
+                      const locationLabel = (!isGlobalAdmin && adminScope?.college)
+                        ? { college: adminScope.college, city: adminScope.city }
+                        : selectedLocation;
+                      return locationLabel?.city && locationLabel?.college
+                        ? `No rooms available for ${locationLabel.college} in ${locationLabel.city}. Try changing city/college from the header.`
+                        : 'Try adjusting your filters or search query.';
+                    })()}
+                  </p>
                   <Button onClick={handleShowAddForm}>
                     {t('addFirstRoom')}
                   </Button>
@@ -1349,6 +1326,7 @@ function App() {
               onAddRoom={handleAddRoom}
               isAdmin={isAdmin}
               canCollectCash={canCollectCash}
+              lockedLocation={!isGlobalAdmin ? adminScope : null}
               paymentSuccess={addRoomPaymentSuccess}
               successRoomCount={addRoomSuccessCount}
               onPaymentDone={() => {
@@ -1369,6 +1347,7 @@ function App() {
               initialRoom={editRoom}
               isEdit
               isAdmin={isAdmin}
+              lockedLocation={!isGlobalAdmin ? adminScope : null}
             />
           </Suspense>
         )
