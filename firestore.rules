@@ -1,0 +1,137 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Payment / subscription fields must only change via:
+    // 1) Admin SDK (Cashfree webhook / verify-payment API), OR
+    // 2) Cash activation from an authenticated client (current app flow)
+    function paymentKeys() {
+      return [
+        'paymentStatus',
+        'subscriptionStatus',
+        'subscriptionStart',
+        'subscriptionEnd',
+        'paymentOrderId',
+        'paymentMethod',
+        'isPublished'
+      ];
+    }
+
+    function touchingPaymentFields() {
+      return request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasAny(paymentKeys());
+    }
+
+    function isCashActivation() {
+      return request.resource.data.get('paymentMethod', '') == 'cash'
+        && request.resource.data.get('paymentStatus', '') == 'paid'
+        && request.resource.data.get('subscriptionStatus', '') == 'active';
+    }
+
+    // Client-side expiry check in fetchRooms()
+    function isExpiryMark() {
+      return request.resource.data.get('paymentStatus', '') == 'expired'
+        && request.resource.data.get('subscriptionStatus', '') == 'expired'
+        && request.resource.data.get('isPublished', true) == false;
+    }
+
+    function validPendingCreate() {
+      // New listings start unpaid (online payment or cash later)
+      return request.resource.data.get('paymentStatus', 'pending') == 'pending'
+        && request.resource.data.get('subscriptionStatus', 'pending') == 'pending';
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // users
+    // App uses BOTH:
+    //   - users/{auth.uid}  (ProfilePage setDoc)
+    //   - auto-id docs with field uid == auth.uid (userService addDoc)
+    // ─────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        userId == request.auth.uid ||
+        resource.data.uid == request.auth.uid
+      );
+
+      allow create: if isSignedIn() && (
+        userId == request.auth.uid ||
+        request.resource.data.uid == request.auth.uid
+      );
+
+      allow update: if isSignedIn() && (
+        userId == request.auth.uid ||
+        resource.data.uid == request.auth.uid
+      );
+
+      // No client deletes of user profiles
+      allow delete: if false;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // rooms
+    // - Reads: any signed-in user (app filters by city/college/stream)
+    // - Creates: signed-in; ownerId is self or null (admin-added platform listing)
+    // - Updates/deletes: signed-in
+    //   (college/global admin is currently client-session based, not Auth claims)
+    // - Payment fields: blocked unless cash activation (Admin SDK bypasses rules)
+    // ─────────────────────────────────────────────────────────────
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && validPendingCreate()
+        && (
+          !('ownerId' in request.resource.data)
+          || request.resource.data.ownerId == null
+          || request.resource.data.ownerId == request.auth.uid
+        );
+
+      allow update: if isSignedIn()
+        && (
+          !touchingPaymentFields()
+          || isCashActivation()
+          || isExpiryMark()
+        );
+
+      allow delete: if isSignedIn();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // bookings
+    // - Students create their own bookings
+    // - Signed-in users can read/update (owners + admin booking management UI)
+    // ─────────────────────────────────────────────────────────────
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Owner + admin booking management (admin is client-session, not Auth claims)
+      allow update, delete: if isSignedIn();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // payments  (Cashfree order mapping)
+    // Written ONLY by Vercel Admin SDK (create-order / webhook / verify)
+    // Clients must never read or write this collection.
+    // ─────────────────────────────────────────────────────────────
+    match /payments/{orderId} {
+      allow read, write: if false;
+    }
+
+    // Deny everything else by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
