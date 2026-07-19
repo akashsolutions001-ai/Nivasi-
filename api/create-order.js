@@ -115,7 +115,7 @@ export default async function handler(req, res) {
   }
 
   // ── Parse & validate body ──────────────────────────────────────────────────
-  const { roomId, roomIds, roomCount, roomType, customerName, customerEmail, customerPhone, returnUrl } = req.body ?? {};
+  const { roomId, roomIds, roomCount, roomType, studentStream, customerName, customerEmail, customerPhone, returnUrl } = req.body ?? {};
 
   // Log full request body for debugging
   console.log('[create-order] request body:', JSON.stringify(req.body));
@@ -186,10 +186,27 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── Resolve amount from roomType (server-side — never trust client) ────────
+  // ── Resolve amount from roomType + stream (server-side — never trust client amount) ────────
   let amount;
+  let resolvedStream = studentStream === 'medical' ? 'medical' : 'engineering';
+
+  // Prefer studentStream stored on the room document when available
+  if (admin.apps.length) {
+    try {
+      const roomDoc = await admin.firestore().collection('rooms').doc(primaryRoomId).get();
+      if (roomDoc.exists) {
+        const streamFromRoom = roomDoc.data()?.studentStream;
+        if (streamFromRoom === 'medical' || streamFromRoom === 'engineering') {
+          resolvedStream = streamFromRoom;
+        }
+      }
+    } catch (err) {
+      console.error('[create-order] Error reading room studentStream:', err);
+    }
+  }
+
   try {
-    amount = getAmountForRoomBatch(roomType, batchCount);
+    amount = getAmountForRoomBatch(roomType, batchCount, resolvedStream);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }

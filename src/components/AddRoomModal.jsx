@@ -275,6 +275,17 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       newErrors.contact = t('validContactNumber');
     }
 
+    if (!formData.studentStream) {
+      newErrors.studentStream = 'Please select Engineering or Medical students';
+    }
+
+    if (!isEdit) {
+      const count = parseInt(formData.roomCount, 10);
+      if (!count || count < 1 || count > MAX_ROOMS_PER_BATCH) {
+        newErrors.roomCount = `Enter a number between 1 and ${MAX_ROOMS_PER_BATCH}`;
+      }
+    }
+
     if (!formData.address.trim()) {
       newErrors.address = t('addressRequired');
     }
@@ -297,10 +308,6 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       newErrors.college = 'College is required';
     }
 
-    if (!formData.studentStream) {
-      newErrors.studentStream = 'Please select Engineering or Medical students';
-    }
-
     if (!formData.gender) {
       newErrors.gender = t('genderRequired');
     }
@@ -309,15 +316,27 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       newErrors.images = t('imagesRequired');
     }
 
-    if (!isEdit) {
-      const count = parseInt(formData.roomCount, 10);
-      if (!count || count < 1 || count > MAX_ROOMS_PER_BATCH) {
-        newErrors.roomCount = `Enter a number between 1 and ${MAX_ROOMS_PER_BATCH}`;
-      }
+    setErrors(newErrors);
+
+    const errorKeys = Object.keys(newErrors);
+    if (errorKeys.length > 0) {
+      const fieldOrder = [
+        'title', 'rent', 'contact', 'studentStream', 'roomCount',
+        'address', 'location', 'mapLink', 'city', 'college', 'gender', 'images'
+      ];
+      const firstKey = fieldOrder.find((k) => newErrors[k]) || errorKeys[0];
+      // Scroll after React paints red borders / messages
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const el = document.querySelector(`[data-field="${firstKey}"]`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 50);
+      });
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return errorKeys.length === 0;
   };
 
   const handleSubmit = async (e) => {
@@ -486,6 +505,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
         roomIds: savedRooms.map((r) => r.id),
         roomCount: savedRooms.length,
         roomType: primary.roomType || primary.rooms || '1 RK',
+        studentStream: primary.studentStream || formData.studentStream || 'engineering',
         customerName: result.customerName || 'Nivasi Host',
         customerEmail: result.customerEmail || 'payments@nivasi.space',
         customerPhone: primary.contact || '9999999999'
@@ -703,7 +723,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             {/* Room Title */}
-            <div>
+            <div data-field="title">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <img src="/logo.svg" alt="Room" className="w-5 h-5 inline mr-1 object-contain" />
                 {t('roomTitle')} *
@@ -724,7 +744,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
 
             {/* Rent and Contact */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div data-field="rent">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <DollarSign className="w-4 h-4 inline mr-1" />
                   {t('rent')} (₹) *
@@ -743,7 +763,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                 )}
               </div>
 
-              <div>
+              <div data-field="contact">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Phone className="w-4 h-4 inline mr-1" />
                   {t('contact')} *
@@ -800,7 +820,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
             </div>
 
             {/* Room for first — drives room type prices and college list */}
-            <div>
+            <div data-field="studentStream">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Room for *
               </label>
@@ -865,7 +885,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                 </div>
               </div>
               {!isEdit && (
-                <div>
+                <div data-field="roomCount">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Number of rooms to add *
                   </label>
@@ -905,7 +925,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
             </div>
 
             {/* Address */}
-            <div>
+            <div data-field="address">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <MapPin className="w-4 h-4 inline mr-1" />
                 {t('address')} *
@@ -926,7 +946,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
 
             {/* Location Area and Map Link */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div data-field="location">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('location')} *
                 </label>
@@ -944,7 +964,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                 )}
               </div>
 
-              <div>
+              <div data-field="mapLink">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('mapLink')} *
                 </label>
@@ -981,7 +1001,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
 
             {/* City and College (college list depends on stream + city) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div data-field="city">
                 <label className="block text-sm font-medium text-gray-700 mb-2">City *</label>
                 <select
                   name="city"
@@ -1002,7 +1022,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                   <p className="text-red-500 text-sm mt-1">{errors.city}</p>
                 )}
               </div>
-              <div>
+              <div data-field="college">
                 <label className="block text-sm font-medium text-gray-700 mb-2">College *</label>
                 <select
                   name="college"
@@ -1119,7 +1139,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
             </div>
 
             {/* Gender Selection */}
-            <div>
+            <div data-field="gender">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('gender')} *
               </label>
@@ -1166,7 +1186,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
             </div>
 
             {/* Images - Conditional rendering based on admin status */}
-            <div>
+            <div data-field="images">
               {isAdmin ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1229,7 +1249,14 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end gap-3 mt-8 pt-6 border-t">
+          <div className="flex flex-col gap-3 mt-8 pt-6 border-t">
+            {Object.keys(errors).length > 0 && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>Please fill all required fields marked with *. Scroll up to see the missing ones.</span>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
             <Button
               type="button"
               variant="outline"
@@ -1255,6 +1282,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                 </>
               )}
             </Button>
+            </div>
           </div>
         </form>
         )}

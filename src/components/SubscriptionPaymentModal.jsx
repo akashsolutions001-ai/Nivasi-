@@ -57,6 +57,7 @@ const SubscriptionPaymentModal = ({
       await initiatePayment({
         roomId: room.id,
         roomType,
+        studentStream: room.studentStream || 'engineering',
         customerName: customerName || 'Nivasi Host',
         customerEmail: customerEmail || 'payments@nivasi.space',
         customerPhone: room.contact || '9999999999'
