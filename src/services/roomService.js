@@ -89,7 +89,10 @@ export const addRoom = async (roomData, user, isAdmin) => {
         
         let amount = 0;
         try {
-            amount = getSubscriptionAmount(roomData.roomType || roomData.rooms || '1 RK');
+            amount = getSubscriptionAmount(
+              roomData.roomType || roomData.rooms || '1 RK',
+              roomData.studentStream || 'engineering'
+            );
         } catch (e) {
             console.error('Error getting subscription amount:', e);
         }

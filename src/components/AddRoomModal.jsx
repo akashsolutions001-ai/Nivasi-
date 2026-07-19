@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import ConfirmationModal from './ConfirmationModal.jsx';
-import { ROOM_TYPE_PRICING, SUBSCRIPTION_DURATION_DAYS, MAX_ROOMS_PER_BATCH, getSubscriptionTotal } from '../utils/subscriptionConfig.js';
+import { SUBSCRIPTION_DURATION_DAYS, MAX_ROOMS_PER_BATCH, getSubscriptionAmount, getSubscriptionTotal, getRoomTypeOptions } from '../utils/subscriptionConfig.js';
 import { setAddRoomPaymentFlow } from '../utils/paymentFlow.js';
 import { initiatePayment } from '../services/paymentService.js';
 import { CITIES, DEFAULT_PLATFORM_CITY, DEFAULT_PLATFORM_COLLEGE, ROOM_STUDENT_STREAMS, DEFAULT_STUDENT_STREAM, getCollegesForCity } from '../utils/locationOptions.js';
@@ -33,10 +33,12 @@ const getPendingSummary = (pendingRoomData) => {
     : 1;
   const roomType = (isBatch ? pendingRoomData.roomType : pendingRoomData.roomType) || '1 RK';
   const title = isBatch ? pendingRoomData.title : pendingRoomData.title;
-  const unitPrice = ROOM_TYPE_PRICING[roomType] ?? ROOM_TYPE_PRICING['1 RK'];
+  const sample = isBatch ? pendingRoomData.rooms?.[0] : pendingRoomData;
+  const studentStream = sample?.studentStream || pendingRoomData.studentStream || DEFAULT_STUDENT_STREAM;
+  const unitPrice = getSubscriptionAmount(roomType, studentStream);
   const total = Number.isFinite(pendingRoomData.totalSubscriptionAmount)
     ? pendingRoomData.totalSubscriptionAmount
-    : getSubscriptionTotal(roomType, roomCount);
+    : getSubscriptionTotal(roomType, roomCount, studentStream);
   return { isBatch, roomCount, roomType, title, unitPrice, total };
 };
 
@@ -71,9 +73,6 @@ const BILL_INCLUSION_OPTIONS = [
   { value: 'lightOnly', label: 'Light bill only (water separate)' },
   { value: 'none', label: 'Neither (light and water extra)' }
 ];
-
-// Room type options (matches rooms.js and App categories)
-const ROOM_TYPE_OPTIONS = ['Single Room', 'Cot Basis', '1 RK', '1 BHK', '2 BHK'];
 
 // Conditions checkboxes (from common patterns in room descriptions)
 const CONDITION_OPTIONS = [
@@ -165,6 +164,13 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       // Reset college when stream or city changes so list stays valid
       if (name === 'studentStream' || name === 'city') {
         next.college = '';
+      }
+      // Keep room type valid for the selected stream's pricing table
+      if (name === 'studentStream') {
+        const options = getRoomTypeOptions(value);
+        if (!options.includes(next.roomType)) {
+          next.roomType = options[0] || '1 RK';
+        }
       }
       return next;
     });
@@ -431,7 +437,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
         roomCount,
         roomType: formData.roomType,
         title: baseTitle,
-        totalSubscriptionAmount: getSubscriptionTotal(formData.roomType, roomCount)
+        totalSubscriptionAmount: getSubscriptionTotal(formData.roomType, roomCount, formData.studentStream)
       });
     } else {
       setPendingRoomData(rooms[0]);
@@ -532,8 +538,9 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
     total: subscriptionAmount
   } = pendingSummary;
   const formRoomCount = Math.min(MAX_ROOMS_PER_BATCH, Math.max(1, parseInt(formData.roomCount, 10) || 1));
-  const formUnitPrice = ROOM_TYPE_PRICING[formData.roomType] ?? ROOM_TYPE_PRICING['1 RK'];
-  const formTotalSubscription = getSubscriptionTotal(formData.roomType, formRoomCount);
+  const roomTypeOptions = getRoomTypeOptions(formData.studentStream);
+  const formUnitPrice = getSubscriptionAmount(formData.roomType, formData.studentStream);
+  const formTotalSubscription = getSubscriptionTotal(formData.roomType, formRoomCount, formData.studentStream);
 
   const headerTitle = isEdit
     ? t('editRoom')
@@ -792,6 +799,38 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
               />
             </div>
 
+            {/* Room for first — drives room type prices and college list */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Room for *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {ROOM_STUDENT_STREAMS.map((stream) => (
+                  <label
+                    key={stream.value}
+                    className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all text-center ${formData.studentStream === stream.value
+                      ? 'border-orange-500 bg-orange-50 text-orange-800'
+                      : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="studentStream"
+                      value={stream.value}
+                      checked={formData.studentStream === stream.value}
+                      onChange={handleInputChange}
+                      disabled={!!lockedLocation}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-semibold">{stream.label}</span>
+                  </label>
+                ))}
+              </div>
+              {errors.studentStream && (
+                <p className="text-red-500 text-sm mt-1">{errors.studentStream}</p>
+              )}
+            </div>
+
             {/* Room Type and Pricing Type */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -802,15 +841,15 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {ROOM_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
+                  {roomTypeOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt} — ₹{getSubscriptionAmount(opt, formData.studentStream)}</option>
                   ))}
                 </select>
                 <div className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded p-2 space-y-1">
                   {formRoomCount > 1 ? (
                     <>
                       <div className="flex items-center justify-between">
-                        <span>Per room: <strong>₹{formUnitPrice}</strong></span>
+                        <span>{formData.roomType}: <strong>₹{formUnitPrice}</strong> per room</span>
                         <span>Duration: <strong>{SUBSCRIPTION_DURATION_DAYS} Days</strong></span>
                       </div>
                       <div className="font-semibold">
@@ -819,7 +858,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                     </>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span>Subscription: <strong>₹{formUnitPrice}</strong></span>
+                      <span>{formData.roomType} subscription: <strong>₹{formUnitPrice}</strong></span>
                       <span>Duration: <strong>{SUBSCRIPTION_DURATION_DAYS} Days</strong></span>
                     </div>
                   )}
@@ -938,38 +977,6 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
                   <p className="text-red-500 text-sm mt-1">{errors.mapLink}</p>
                 )}
               </div>
-            </div>
-
-            {/* Student stream first — drives college list */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Room for *
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {ROOM_STUDENT_STREAMS.map((stream) => (
-                  <label
-                    key={stream.value}
-                    className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all text-center ${formData.studentStream === stream.value
-                      ? 'border-orange-500 bg-orange-50 text-orange-800'
-                      : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      name="studentStream"
-                      value={stream.value}
-                      checked={formData.studentStream === stream.value}
-                      onChange={handleInputChange}
-                      disabled={!!lockedLocation}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-semibold">{stream.label}</span>
-                  </label>
-                ))}
-              </div>
-              {errors.studentStream && (
-                <p className="text-red-500 text-sm mt-1">{errors.studentStream}</p>
-              )}
             </div>
 
             {/* City and College (college list depends on stream + city) */}

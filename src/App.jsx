@@ -352,7 +352,10 @@ function App() {
     { key: 'Cot Basis', label: t('cotBasis') },
     { key: '1 RK', label: t('oneRK') },
     { key: '1 BHK', label: t('oneBHK') },
-    { key: '2 BHK', label: t('twoBHK') }
+    { key: '2 BHK', label: t('twoBHK') },
+    { key: '3 BHK', label: '3 BHK' },
+    { key: '4 BHK', label: '4 BHK' },
+    { key: '5 BHK', label: '5 BHK' }
   ], [t]);
 
   // Helper function to get the original English key for a category
@@ -363,7 +366,10 @@ function App() {
       'Cot Basis': 'Cot Basis',
       '1 RK': '1 RK',
       '1 BHK': '1 BHK',
-      '2 BHK': '2 BHK'
+      '2 BHK': '2 BHK',
+      '3 BHK': '3 BHK',
+      '4 BHK': '4 BHK',
+      '5 BHK': '5 BHK'
     };
     return categoryMap[categoryKey] || categoryKey;
   }, []);

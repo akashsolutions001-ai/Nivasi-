@@ -29,7 +29,7 @@ const SubscriptionPaymentModal = ({
   if (!room) return null;
 
   const roomType = room.roomType || room.rooms || '1 RK';
-  const amount = room.subscriptionAmount ?? getSubscriptionAmount(roomType);
+  const amount = room.subscriptionAmount ?? getSubscriptionAmount(roomType, room.studentStream || 'engineering');
 
   const handlePaymentChoice = async (paymentMethod) => {
     setIsSubmitting(true);
