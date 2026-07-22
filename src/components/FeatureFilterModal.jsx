@@ -6,7 +6,7 @@ import { Slider } from '@/components/ui/slider.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import { getTranslatedRooms } from '../data/rooms.js';
 
-const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = {}, currentMaxPrice = 50000 }) => {
+const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = {}, currentMaxPrice = 100000 }) => {
   const { t, language } = useLanguage();
   const [selectedFeatures, setSelectedFeatures] = useState(currentFilters);
   const [maxPrice, setMaxPrice] = useState(currentMaxPrice);
@@ -59,7 +59,7 @@ const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = 
 
   const handleClearAll = () => {
     setSelectedFeatures({});
-    setMaxPrice(50000); // Reset to default max
+    setMaxPrice(100000); // Reset to default max
   };
 
   const handleSelectAll = () => {
@@ -105,20 +105,31 @@ const FeatureFilterModal = ({ isOpen, onClose, onApplyFilters, currentFilters = 
           <div className="space-y-4 sm:space-y-6">
             {/* Price Filter */}
             <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-3">
-                {t('maxRent') || 'Max Monthly Rent'}: <span className="text-orange-600 font-bold">₹{maxPrice.toLocaleString()}</span>
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-900">
+                  {t('maxRent') || 'Max Monthly Rent'}
+                </h3>
+                <div className="relative w-28">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                  <input
+                    type="number"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(Number(e.target.value) || 0)}
+                    className="w-full pl-7 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-all outline-none font-bold text-orange-700 text-sm"
+                  />
+                </div>
+              </div>
               <Slider
                 defaultValue={[maxPrice]}
                 value={[maxPrice]}
-                max={50000}
-                step={500}
+                max={100000}
+                step={1000}
                 onValueChange={(vals) => setMaxPrice(vals[0])}
                 className="py-4"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>₹0</span>
-                <span>₹50,000+</span>
+                <span>₹1,00,000+</span>
               </div>
             </div>
 

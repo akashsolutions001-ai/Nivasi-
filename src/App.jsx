@@ -134,7 +134,7 @@ function App() {
 
   const [showFeatureFilter, setShowFeatureFilter] = useState(false);
   const [featureFilters, setFeatureFilters] = useState({});
-  const [maxPrice, setMaxPrice] = useState(10000);
+  const [maxPrice, setMaxPrice] = useState(100000);
   const [activeSection, setActiveSection] = useState('rooms'); // 'rooms' | 'mess'
   const [messItems, setMessItems] = useState([]);
   const [roomToDelete, setRoomToDelete] = useState(null);
@@ -1032,7 +1032,7 @@ function App() {
                 onClick={() => setShowFeatureFilter(true)}
                 variant="outline"
                 size="sm"
-                className={`w-full md:w-auto flex justify-center items-center min-h-[44px] md:min-h-0 text-sm px-3 bg-white lg:hidden ${Object.keys(featureFilters).length > 0 || maxPrice < 10000 ? 'border-orange-500 text-orange-600' : ''}`}
+                className={`w-full md:w-auto flex justify-center items-center min-h-[44px] md:min-h-0 text-sm px-3 bg-white lg:hidden ${Object.keys(featureFilters).length > 0 || maxPrice < 100000 ? 'border-orange-500 text-orange-600' : ''}`}
               >
                 <Filter className="w-4 h-4 mr-2 shrink-0" />
                 <span className="whitespace-nowrap">Filters</span>
@@ -1058,11 +1058,11 @@ function App() {
               {/* Header */}
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-800">Filters</h3>
-                {(Object.keys(featureFilters).length > 0 || maxPrice < 50000 || category !== 'All') && (
+                {(Object.keys(featureFilters).length > 0 || maxPrice < 100000 || category !== 'All') && (
                   <button
                     onClick={() => {
                       setFeatureFilters({});
-                      setMaxPrice(10000);
+                      setMaxPrice(100000);
                       setCategory('All');
                     }}
                     className="text-xs font-bold text-orange-600 hover:text-orange-700 uppercase tracking-wide"
@@ -1093,22 +1093,31 @@ function App() {
 
               {/* Budget Section */}
               <div>
-                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">{t('budget') || 'Budget'}</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('budget') || 'Budget'}</h4>
+                  <div className="relative w-24">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">₹</span>
+                    <input
+                      type="number"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(Number(e.target.value) || 0)}
+                      className="w-full pl-6 pr-2 py-1 bg-white border border-gray-200 rounded-md focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm font-bold text-orange-700"
+                    />
+                  </div>
+                </div>
                 <div className="px-1 mb-4">
                   <Slider
                     defaultValue={[maxPrice]}
                     value={[maxPrice]}
-                    max={10000}
-                    step={500}
+                    max={100000}
+                    step={1000}
                     onValueChange={(vals) => setMaxPrice(vals[0])}
                     className="py-2"
                   />
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">₹0</span>
-                  <div className="bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
-                    <span className="font-bold text-orange-700">₹{maxPrice.toLocaleString()}</span>
-                  </div>
+                <div className="flex justify-between items-center text-xs text-gray-500">
+                  <span>₹0</span>
+                  <span>₹1,00,000+</span>
                 </div>
               </div>
 
