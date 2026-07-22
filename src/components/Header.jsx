@@ -42,7 +42,7 @@ const Header = ({
                     {/* Top Row - Logo, Title, Profile */}
                     <div className="flex items-center justify-between mb-2 px-1">
                         <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity min-w-0 flex-1 mr-2">
-                            <Logo className="h-7 w-auto bg-white/20 backdrop-blur-sm rounded-lg flex-shrink-0" />
+                            <Logo className="h-10 w-auto flex-shrink-0" />
                             <div className="flex flex-col min-w-0">
                                 <h1 className="text-sm font-bold text-white leading-tight truncate">
                                     {t('title')}
@@ -133,7 +133,7 @@ const Header = ({
                 <div className="hidden sm:flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center relative z-10 w-full">
                     <div className="flex flex-col xs:flex-row xs:items-center gap-2 sm:gap-4 w-full">
                         <Link to="/" className="flex items-center gap-3 mx-auto sm:mx-0 hover:opacity-90 transition-opacity">
-                            <Logo className="bg-white/20 backdrop-blur-sm" />
+                            <Logo size="large" />
                             <div className="text-center sm:text-left">
                                 <h1 className="text-2xl xs:text-3xl font-bold text-white leading-tight">
                                     {t('title')}
