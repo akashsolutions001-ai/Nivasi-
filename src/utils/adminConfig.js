@@ -31,7 +31,9 @@ export const ADMIN_PASSWORDS = {
     canCollectCash: false,
     city: 'Kolhapur',
     college: DY_PATIL_MEDICAL_KOLHAPUR,
-    studentStream: 'medical'
+    studentStream: 'medical',
+    name: 'VIJAY BIRAJDAR',
+    profilePicture: '/ADMIN PROFILE/DYPMEDICAL1_converted.avif'
   }
 };
 
@@ -54,7 +56,9 @@ export function authenticateAdmin(password) {
           city: config.city || DEFAULT_PLATFORM_CITY,
           college: config.college || DEFAULT_PLATFORM_COLLEGE,
           studentStream: config.studentStream || 'engineering'
-        }
+        },
+    adminName: config.name || null,
+    adminProfilePicture: config.profilePicture || null
   };
 }
 

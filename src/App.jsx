@@ -477,6 +477,8 @@ function App() {
           if (!hasSub || room.paymentStatus !== 'pending') return false;
         } else if (adminFilter === 'expired') {
           if (!hasSub || (room.paymentStatus !== 'expired' && !(room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd)))) return false;
+        } else if (adminFilter === 'deletionRequests') {
+          if (!room.deleteRequested) return false;
         }
       }
 
@@ -786,6 +788,40 @@ function App() {
     setRoomToDelete(room);
   }, []);
 
+  const handleApproveDelete = useCallback(async (roomToApprove) => {
+    if (!isGlobalAdmin) return;
+    try {
+      const { deleteRoom } = await import('./services/roomService.js');
+      await deleteRoom(roomToApprove.id);
+      setRooms(prev => prev.filter(r => r.id !== roomToApprove.id));
+      setNotification({
+        message: 'The room has been completely deleted.',
+        type: 'success',
+        isVisible: true,
+        title: 'Deletion Approved'
+      });
+    } catch (error) {
+      console.error('Error approving room deletion:', error);
+    }
+  }, [isGlobalAdmin]);
+
+  const handleRejectDelete = useCallback(async (roomToReject) => {
+    if (!isGlobalAdmin) return;
+    try {
+      const { rejectRoomDeletion } = await import('./services/roomService.js');
+      await rejectRoomDeletion(roomToReject.id);
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToReject.id ? { ...r, deleteRequested: false, deleteRequestedBy: null } : r)));
+      setNotification({
+        message: 'The deletion request has been rejected.',
+        type: 'info',
+        isVisible: true,
+        title: 'Deletion Rejected'
+      });
+    } catch (error) {
+      console.error('Error rejecting room deletion:', error);
+    }
+  }, [isGlobalAdmin]);
+
   const handleConfirmDeleteRoom = useCallback(async () => {
     if (!roomToDelete || isDeleting) return;
     if (!assertAdminCanManageRoom(roomToDelete)) {
@@ -796,7 +832,7 @@ function App() {
     setIsDeleting(true);
     let deletedRoomId = roomToDelete.id;
     try {
-      const { deleteRoom } = await import('./services/roomService.js');
+      const { deleteRoom, requestRoomDeletion } = await import('./services/roomService.js');
       let roomForDelete = roomToDelete;
       if (!isFirestoreRoom(roomForDelete)) {
         rememberDeletedStaticRoom(roomForDelete);
@@ -805,30 +841,33 @@ function App() {
       deletedRoomId = roomForDelete.id;
 
       if (deletedRoomId) {
-        await deleteRoom(deletedRoomId);
+        if (isGlobalAdmin || (user && roomForDelete.ownerId === user.uid)) {
+          await deleteRoom(deletedRoomId);
+          setRooms(prev => prev.filter(r => r.id !== deletedRoomId));
+          setNotification({
+            message: 'The room has been removed from the listings.',
+            type: 'success',
+            isVisible: true,
+            title: 'Room Deleted Successfully!'
+          });
+        } else {
+          await requestRoomDeletion(deletedRoomId, user?.uid || 'admin');
+          setRooms(prev => deduplicateRooms(prev.map(r => r.id === deletedRoomId ? { ...r, deleteRequested: true } : r)));
+          setNotification({
+            message: 'Deletion request sent to global admin.',
+            type: 'success',
+            isVisible: true,
+            title: 'Deletion Requested'
+          });
+        }
       }
     } catch (error) {
-      console.error('Error deleting room from Firestore (will still remove locally):', error);
+      console.error('Error handling room deletion:', error);
     } finally {
-      // Only delete by unique Firestore document ID to prevent deleting rooms with similar data
-      setRooms(prev => prev.filter(r => {
-        // Only remove the room with the exact matching ID
-        if (r.id && deletedRoomId) {
-          return r.id !== deletedRoomId;
-        }
-        // If somehow a room has no ID, don't delete it
-        return true;
-      }));
-      setNotification({
-        message: 'The room has been removed from the listings.',
-        type: 'success',
-        isVisible: true,
-        title: 'Room Deleted Successfully!'
-      });
       setIsDeleting(false);
       setRoomToDelete(null);
     }
-  }, [roomToDelete, isDeleting, materializeStaticRoom, assertAdminCanManageRoom]);
+  }, [roomToDelete, isDeleting, materializeStaticRoom, assertAdminCanManageRoom, isGlobalAdmin, user]);
 
   // Handler to request toggle room visibility (opens confirmation modal)
   const handleRequestToggleHidden = useCallback((room) => {
@@ -1218,6 +1257,9 @@ function App() {
                       onRenew={() => requireAuth('renew-room', () => handleRenewRoomSubscription(room))}
                       onVerify={() => handleVerifyRoom(room)}
                       onReject={() => handleRejectRoom(room)}
+                      isGlobalAdmin={isGlobalAdmin}
+                      onApproveDelete={() => handleApproveDelete(room)}
+                      onRejectDelete={() => handleRejectDelete(room)}
                       t={t}
                     />
                   ))}

@@ -51,6 +51,14 @@ export const UserPreferencesProvider = ({ children }) => {
 
     const [adminScope, setAdminScope] = useState(() => readAdminScope());
 
+    const [adminName, setAdminName] = useState(() => {
+        return sessionStorage.getItem('adminName') || null;
+    });
+
+    const [adminProfilePicture, setAdminProfilePicture] = useState(() => {
+        return sessionStorage.getItem('adminProfilePicture') || null;
+    });
+
     /**
      * @param {boolean} active
      * @param {boolean|{ canCollectCash?: boolean, isGlobalAdmin?: boolean, adminScope?: object|null }} sessionOrCash
@@ -72,6 +80,8 @@ export const UserPreferencesProvider = ({ children }) => {
         setCanCollectCash(!!session.canCollectCash);
         setIsGlobalAdmin(!!session.isGlobalAdmin);
         setAdminScope(session.isGlobalAdmin ? null : (session.adminScope || null));
+        setAdminName(session.adminName || null);
+        setAdminProfilePicture(session.adminProfilePicture || null);
     };
 
     useEffect(() => {
@@ -93,16 +103,30 @@ export const UserPreferencesProvider = ({ children }) => {
                     sessionStorage.removeItem('adminScope');
                 }
             }
+            if (adminName) {
+                sessionStorage.setItem('adminName', adminName);
+            } else {
+                sessionStorage.removeItem('adminName');
+            }
+            if (adminProfilePicture) {
+                sessionStorage.setItem('adminProfilePicture', adminProfilePicture);
+            } else {
+                sessionStorage.removeItem('adminProfilePicture');
+            }
         } else {
             sessionStorage.removeItem('isAdmin');
             sessionStorage.removeItem('canCollectCash');
             sessionStorage.removeItem('isGlobalAdmin');
             sessionStorage.removeItem('adminScope');
+            sessionStorage.removeItem('adminName');
+            sessionStorage.removeItem('adminProfilePicture');
             setCanCollectCash(false);
             setIsGlobalAdmin(false);
             setAdminScope(null);
+            setAdminName(null);
+            setAdminProfilePicture(null);
         }
-    }, [isAdmin, canCollectCash, isGlobalAdmin, adminScope]);
+    }, [isAdmin, canCollectCash, isGlobalAdmin, adminScope, adminName, adminProfilePicture]);
 
     // College admins stay locked to their college location for filtering
     useEffect(() => {
@@ -157,6 +181,8 @@ export const UserPreferencesProvider = ({ children }) => {
         setCanCollectCash,
         isGlobalAdmin,
         adminScope,
+        adminName,
+        adminProfilePicture,
         setAdminSession
     };
 

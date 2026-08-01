@@ -9,8 +9,13 @@ function computeSubMetrics(roomList) {
   let expired = 0;
   let verifiedRooms = 0;
   let pendingVerification = 0;
+  let deletionRequests = 0;
 
   roomList.forEach((room) => {
+    if (room.deleteRequested) {
+      deletionRequests++;
+    }
+
     if (room.verificationStatus === 'verified') {
       verifiedRooms++;
     } else if (room.verificationStatus === 'pending') {
@@ -32,7 +37,7 @@ function computeSubMetrics(roomList) {
     }
   });
 
-  return { total: roomList.length, active, pending, expired, verifiedRooms, pendingVerification };
+  return { total: roomList.length, active, pending, expired, verifiedRooms, pendingVerification, deletionRequests };
 }
 
 const MetricButton = ({ active, onClick, activeClass, idleClass, children }) => (
@@ -197,6 +202,20 @@ const AdminMetrics = ({
           </p>
           <p className="text-xl font-bold text-red-800">{metrics.expired}</p>
         </MetricButton>
+
+        {isGlobalAdmin && (
+          <MetricButton
+            active={adminFilter === 'deletionRequests'}
+            onClick={() => setAdminFilter('deletionRequests')}
+            activeClass="bg-rose-100 border-rose-400 shadow-inner"
+            idleClass="bg-rose-50 border-rose-200 hover:bg-rose-100"
+          >
+            <p className="text-xs font-semibold text-rose-600 flex items-center gap-1 mb-1">
+              <AlertCircle className="w-3 h-3" /> Del Requests
+            </p>
+            <p className="text-xl font-bold text-rose-800">{metrics.deletionRequests}</p>
+          </MetricButton>
+        )}
       </div>
     </div>
   );

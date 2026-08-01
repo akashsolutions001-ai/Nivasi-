@@ -1,11 +1,11 @@
 import React, { useState, useCallback, memo } from 'react';
-import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar, EyeOff, Eye } from 'lucide-react';
+import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X as XIcon, Calendar, EyeOff, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import { isSubscriptionActive, isExpiringSoon, getDaysUntilExpiry } from '../utils/subscriptionConfig.js';
 
-const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew, onVerify, onReject }) => {
+const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew, onVerify, onReject, isGlobalAdmin, onApproveDelete, onRejectDelete }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
@@ -111,6 +111,13 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
       {(isAdmin || isOwner) && room.verificationStatus === 'rejected' && (
         <div className="absolute top-2 right-2 z-10 bg-red-600/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow-lg">
           Rejected
+        </div>
+      )}
+      {/* Deletion Requested Badge */}
+      {room.deleteRequested && isAdmin && (
+        <div className="absolute top-10 left-2 z-10 bg-rose-600/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          <span className="hidden xs:inline">Deletion Requested</span>
         </div>
       )}
       {/* Image Section (only first image visible) */}
@@ -339,12 +346,33 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
               <Button
                 onClick={onDelete}
                 variant="outline"
+                disabled={room.deleteRequested && !isGlobalAdmin}
                 className="flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 border-red-300 text-red-700 hover:bg-red-50 active:bg-red-100 touch-manipulation active:scale-[0.98] transition-transform"
                 size="sm"
               >
-                Delete
+                {room.deleteRequested && !isGlobalAdmin ? 'Delete Pending' : 'Delete'}
               </Button>
             </div>
+            
+            {room.deleteRequested && isGlobalAdmin && (
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mt-1">
+                <Button
+                  onClick={() => onApproveDelete && onApproveDelete(room)}
+                  className="bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 transition-colors"
+                  size="sm"
+                >
+                  Approve Delete
+                </Button>
+                <Button
+                  onClick={() => onRejectDelete && onRejectDelete(room)}
+                  variant="outline"
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 transition-colors"
+                  size="sm"
+                >
+                  Reject Delete
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

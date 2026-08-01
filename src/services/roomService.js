@@ -25,7 +25,10 @@ const PROTECTED_UPDATE_FIELDS = [
     'paymentMethod',
     'isPublished',
     'roomStatus',
-    'visibility'
+    'visibility',
+    'deleteRequested',
+    'deleteRequestedBy',
+    'deleteRequestedAt'
 ];
 
 /**
@@ -327,6 +330,44 @@ export const deleteRoom = async (roomId) => {
         return true;
     } catch (error) {
         console.error('Error deleting room from Firestore:', error);
+        throw error;
+    }
+};
+
+/**
+ * Request room deletion (for local admins)
+ */
+export const requestRoomDeletion = async (roomId, adminId) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            deleteRequested: true,
+            deleteRequestedBy: adminId,
+            deleteRequestedAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error requesting room deletion:', error);
+        throw error;
+    }
+};
+
+/**
+ * Reject room deletion
+ */
+export const rejectRoomDeletion = async (roomId) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            deleteRequested: false,
+            deleteRequestedBy: null,
+            deleteRequestedAt: null,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error rejecting room deletion:', error);
         throw error;
     }
 };

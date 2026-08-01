@@ -32,7 +32,7 @@ const ModalLoadingSpinner = () => (
 
 const ProfilePage = () => {
     const { user, isAuthenticated } = useAuth();
-    const { setSelectedGender, setSelectedLocation, setSelectedStudentStream } = useUserPreferences();
+    const { setSelectedGender, setSelectedLocation, setSelectedStudentStream, isAdmin, isGlobalAdmin, adminScope, adminName, adminProfilePicture } = useUserPreferences();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const isOnboarding = searchParams.get('onboarding') === 'true';
@@ -500,15 +500,23 @@ const ProfilePage = () => {
                     <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 sm:px-8 py-8 sm:py-10 text-white">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm">
-                                    <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                                <div className={`bg-white/20 rounded-full backdrop-blur-sm overflow-hidden flex items-center justify-center flex-shrink-0 border-2 border-white/40 shadow-sm ${isAdmin && adminProfilePicture ? 'w-20 h-20 sm:w-28 sm:h-28 p-1' : 'w-16 h-16 sm:w-20 sm:h-20 p-3'}`}>
+                                    {isAdmin ? (
+                                        adminProfilePicture ? (
+                                            <img src={adminProfilePicture} alt="Admin Profile" className="w-full h-full object-cover rounded-full" />
+                                        ) : (
+                                            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                                        )
+                                    ) : (
+                                        <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                                    )}
                                 </div>
                                 <div>
                                     <h1 className="text-2xl sm:text-3xl font-bold">
-                                        {isOnboarding ? 'Complete Your Profile' : 'My Profile'}
+                                        {isAdmin ? (adminName ? adminName : 'Admin Profile') : (isOnboarding ? 'Complete Your Profile' : 'My Profile')}
                                     </h1>
                                     <p className="text-orange-100 mt-1 text-sm sm:text-base">
-                                        {isOnboarding ? 'Please fill in your details to continue' : 'Manage your personal information'}
+                                        {isAdmin ? 'Manage your admin settings' : (isOnboarding ? 'Please fill in your details to continue' : 'Manage your personal information')}
                                     </p>
                                 </div>
                             </div>
@@ -526,6 +534,40 @@ const ProfilePage = () => {
                     </div>
 
                     {/* Form Section */}
+                    {isAdmin ? (
+                        <div className="p-6 sm:p-8 text-center space-y-4">
+                            <Shield className="w-16 h-16 text-orange-500 mx-auto" />
+                            <h2 className="text-2xl font-bold text-gray-900">Admin Login Active</h2>
+                            <p className="text-gray-600">You are logged in as an administrator.</p>
+                            
+                            <div className="bg-orange-50 rounded-xl p-6 max-w-md mx-auto text-left space-y-4 mt-6 border border-orange-100 shadow-sm">
+                                {adminName && (
+                                    <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                        <span className="text-gray-600 font-medium">Name</span>
+                                        <span className="text-gray-900 font-semibold">{adminName}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                    <span className="text-gray-600 font-medium">Role</span>
+                                    <span className="text-orange-700 font-bold">{isGlobalAdmin ? 'Global Admin' : 'Local Admin'}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                    <span className="text-gray-600 font-medium">Access Scope</span>
+                                    <span className="text-gray-900 font-semibold">{isGlobalAdmin ? 'All Locations' : (adminScope?.city || 'Restricted')}</span>
+                                </div>
+                                {!isGlobalAdmin && adminScope?.college && (
+                                    <div className="flex justify-between items-center pb-2">
+                                        <span className="text-gray-600 font-medium">Assigned College</span>
+                                        <span className="text-gray-900 font-semibold text-right">{adminScope.college}</span>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="pt-6">
+                                <p className="text-sm text-gray-500 mb-4">Use the top header navigation to access Booking Management.</p>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="p-6 sm:p-8">
                         <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -723,6 +765,7 @@ const ProfilePage = () => {
                             </div>
                         </form>
                     </div>
+                    )}
                 </div>
 
                 {/* My Rooms Section */}
@@ -864,16 +907,18 @@ const ProfilePage = () => {
                 {/* ────────────────────────────────────────────────── */}
 
                 {/* Admin Login Button */}
-                <div className="mt-8 flex justify-center">
-                    <Button 
-                        variant="outline" 
-                        className="text-gray-500 hover:text-orange-600 border-gray-200 hover:bg-orange-50"
-                        onClick={() => navigate('/admin/login')}
-                    >
-                        <Shield className="w-4 h-4 mr-2" />
-                        Admin Login
-                    </Button>
-                </div>
+                {!isAdmin && (
+                    <div className="mt-8 flex justify-center">
+                        <Button 
+                            variant="outline" 
+                            className="text-gray-500 hover:text-orange-600 border-gray-200 hover:bg-orange-50"
+                            onClick={() => navigate('/admin/login')}
+                        >
+                            <Shield className="w-4 h-4 mr-2" />
+                            Admin Login
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
