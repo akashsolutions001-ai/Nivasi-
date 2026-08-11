@@ -53,7 +53,7 @@ const RoomDetailModal = ({ room, onClose }) => {
       setCurrentImageIndex((prev) =>
         prev === room.images.length - 1 ? 0 : prev + 1
       );
-    }, 2000);
+    }, 4000);
 
     return () => clearInterval(intervalId);
   }, [room.images, isPaused]);
@@ -88,16 +88,25 @@ const RoomDetailModal = ({ room, onClose }) => {
 
   const handleTouchEnd = () => {
     setIsPaused(false);
-    if (!touchStartX || !touchEndX) return;
+    if (!touchStartX) return;
+    
+    if (!touchEndX) {
+      setTouchStartX(0);
+      return;
+    }
+    
     const distance = touchStartX - touchEndX;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
     if (isLeftSwipe) {
       handleNextImage();
-    }
-    if (isRightSwipe) {
+    } else if (isRightSwipe) {
       handlePrevImage();
+    } else {
+      // Tiny movement, treat as a tap
+      setIsPaused(true);
+      setIsFullscreen(true);
     }
     
     setTouchStartX(0);
@@ -219,6 +228,7 @@ const RoomDetailModal = ({ room, onClose }) => {
                           alt={`${room.title} - Image ${currentImageIndex + 1}`}
                           className="w-full h-auto max-h-[35vh] sm:max-h-[45vh] lg:max-h-[60vh] object-contain cursor-zoom-in mx-auto block select-none"
                           onClick={() => { setIsPaused(true); setIsFullscreen(true); }}
+                          draggable={false}
                           onError={(e) => { e.target.src = 'https://placehold.co/600x400?text=Image+Not+Available'; e.target.onerror = null; }}
                         />
 
