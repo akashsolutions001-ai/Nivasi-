@@ -152,7 +152,7 @@ function App() {
     if (isFirestoreRoom(room)) return room;
     const { addRoom } = await import('./services/roomService.js');
     const migrated = await addRoom(room, user, isAdmin);
-    setRooms(prev => deduplicateRooms(prev.map((r) => (r.id === room.id ? migrated : r))));
+    setRooms(prev => deduplicateRooms(prev.map((r) => (String(r.id) === String(room.id) ? migrated : r))));
     return migrated;
   }, [user, isAdmin]);
 
@@ -680,12 +680,13 @@ function App() {
     try {
       const { activateCashSubscription } = await import('./services/roomService.js');
       const result = await activateCashSubscription(room.id);
+      const updatedData = Array.isArray(result) ? result[0] : result;
       setRooms(prev =>
         deduplicateRooms(
-          prev.map(r => (r.id === room.id ? { ...r, ...result } : r))
+          prev.map(r => (String(r.id) === String(room.id) ? { ...r, ...updatedData } : r))
         )
       );
-      setSubscriptionPayRoom((prev) => (prev?.id === room.id ? { ...prev, ...result } : prev));
+      setSubscriptionPayRoom((prev) => (prev?.id === room.id ? { ...prev, ...updatedData } : prev));
     } catch (error) {
       console.error('Error recording cash payment:', error);
       setNotification({
@@ -728,7 +729,7 @@ function App() {
       }
       const targetRoom = await materializeStaticRoom(payload);
       const savedRoom = await updateRoom(targetRoom.id, { ...payload, id: targetRoom.id });
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => String(r.id) === String(savedRoom.id) ? { ...r, ...savedRoom } : r)));
       setEditRoom(null);
       setNotification({
         message: 'Your room listing has been updated with the new details.',
@@ -739,7 +740,7 @@ function App() {
     } catch (error) {
       console.error('Error updating room:', error);
       // Still update locally even if Firestore fails
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => String(r.id) === String(updatedRoom.id) ? { ...r, ...updatedRoom } : r)));
       setEditRoom(null);
       setNotification({
         message: 'Changes saved locally. Will sync when connection is restored.',
@@ -755,7 +756,7 @@ function App() {
     try {
       const { verifyRoom } = await import('./services/roomService.js');
       await verifyRoom(roomToVerify.id, user?.uid || 'admin');
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToVerify.id ? { ...r, verificationStatus: 'verified' } : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => String(r.id) === String(roomToVerify.id) ? { ...r, verificationStatus: 'verified' } : r)));
       setNotification({
         message: 'The room has been verified successfully.',
         type: 'success',
@@ -772,7 +773,7 @@ function App() {
     try {
       const { rejectRoom } = await import('./services/roomService.js');
       await rejectRoom(roomToReject.id, user?.uid || 'admin');
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToReject.id ? { ...r, verificationStatus: 'rejected' } : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => String(r.id) === String(roomToReject.id) ? { ...r, verificationStatus: 'rejected' } : r)));
       setNotification({
         message: 'The room has been rejected.',
         type: 'info',
@@ -793,7 +794,7 @@ function App() {
     try {
       const { deleteRoom } = await import('./services/roomService.js');
       await deleteRoom(roomToApprove.id);
-      setRooms(prev => prev.filter(r => r.id !== roomToApprove.id));
+      setRooms(prev => prev.filter(r => String(r.id) !== String(roomToApprove.id)));
       setNotification({
         message: 'The room has been completely deleted.',
         type: 'success',
@@ -810,7 +811,7 @@ function App() {
     try {
       const { rejectRoomDeletion } = await import('./services/roomService.js');
       await rejectRoomDeletion(roomToReject.id);
-      setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToReject.id ? { ...r, deleteRequested: false, deleteRequestedBy: null } : r)));
+      setRooms(prev => deduplicateRooms(prev.map(r => String(r.id) === String(roomToReject.id) ? { ...r, deleteRequested: false, deleteRequestedBy: null } : r)));
       setNotification({
         message: 'The deletion request has been rejected.',
         type: 'info',
@@ -843,7 +844,7 @@ function App() {
       if (deletedRoomId) {
         if (isGlobalAdmin || (user && roomForDelete.ownerId === user.uid)) {
           await deleteRoom(deletedRoomId);
-          setRooms(prev => prev.filter(r => r.id !== deletedRoomId));
+          setRooms(prev => prev.filter(r => String(r.id) !== String(deletedRoomId)));
           setNotification({
             message: 'The room has been removed from the listings.',
             type: 'success',
@@ -852,7 +853,7 @@ function App() {
           });
         } else {
           await requestRoomDeletion(deletedRoomId, user?.uid || 'admin');
-          setRooms(prev => deduplicateRooms(prev.map(r => r.id === deletedRoomId ? { ...r, deleteRequested: true } : r)));
+          setRooms(prev => deduplicateRooms(prev.map(r => String(r.id) === String(deletedRoomId) ? { ...r, deleteRequested: true } : r)));
           setNotification({
             message: 'Deletion request sent to global admin.',
             type: 'success',
@@ -890,7 +891,7 @@ function App() {
       const updatedRoom = { ...room, hidden: !room.hidden };
       await updateRoom(room.id, updatedRoom);
 
-      setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
+      setRooms(prev => prev.map(r => String(r.id) === String(room.id) ? updatedRoom : r));
       setNotification({
         message: room.hidden
           ? 'Room is now visible to all users.'
@@ -903,7 +904,7 @@ function App() {
       console.error('Error toggling room visibility:', error);
       // Still update locally even if Firestore fails
       const updatedRoom = { ...room, hidden: !room.hidden };
-      setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
+      setRooms(prev => prev.map(r => String(r.id) === String(room.id) ? updatedRoom : r));
       setNotification({
         message: 'Visibility changed locally. Will sync when connection is restored.',
         type: 'warning',

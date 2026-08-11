@@ -322,7 +322,7 @@ const ProfilePage = () => {
         try {
             const { updateRoom } = await import('../services/roomService.js');
             const savedRoom = await updateRoom(updatedRoom.id, updatedRoom);
-            setMyRooms(prev => prev.map(r => r.id === savedRoom.id ? { ...r, ...savedRoom } : r));
+            setMyRooms(prev => prev.map(r => String(r.id) === String(savedRoom.id) ? { ...r, ...savedRoom } : r));
             setEditRoom(null);
             setNotification({
                 message: 'Your room listing has been updated.',
@@ -332,7 +332,7 @@ const ProfilePage = () => {
             });
         } catch (error) {
             console.error('Error updating room:', error);
-            setMyRooms(prev => prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r));
+            setMyRooms(prev => prev.map(r => String(r.id) === String(updatedRoom.id) ? { ...r, ...updatedRoom } : r));
             setEditRoom(null);
             setNotification({
                 message: 'Changes saved locally. Will sync when connection is restored.',
@@ -356,7 +356,7 @@ const ProfilePage = () => {
         } catch (error) {
             console.error('Error deleting room:', error);
         } finally {
-            setMyRooms(prev => prev.filter(r => r.id !== roomToDelete.id));
+            setMyRooms(prev => prev.filter(r => String(r.id) !== String(roomToDelete.id)));
             setIsDeleting(false);
             setRoomToDelete(null);
             setNotification({
@@ -373,7 +373,7 @@ const ProfilePage = () => {
             const { updateRoom } = await import('../services/roomService.js');
             const updatedRoom = { ...room, hidden: !room.hidden };
             await updateRoom(room.id, updatedRoom);
-            setMyRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
+            setMyRooms(prev => prev.map(r => String(r.id) === String(room.id) ? updatedRoom : r));
             setNotification({
                 message: room.hidden ? 'Room is now visible.' : 'Room is now hidden.',
                 type: 'success',
@@ -382,7 +382,7 @@ const ProfilePage = () => {
             });
         } catch (error) {
             console.error('Error toggling room visibility:', error);
-            setMyRooms(prev => prev.map(r => r.id === room.id ? { ...r, hidden: !r.hidden } : r));
+            setMyRooms(prev => prev.map(r => String(r.id) === String(room.id) ? { ...r, hidden: !r.hidden } : r));
         }
     }, []);
 
