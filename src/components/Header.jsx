@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Phone, Shield, User, Settings, Calendar, MapPin, LogOut } from 'lucide-react';
+import { Phone, Shield, User, Calendar, MapPin, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import Logo from './Logo.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
@@ -152,18 +152,16 @@ const Header = ({
                             disabled={isAdmin && !isGlobalAdmin}
                             className="w-full sm:w-auto bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm disabled:opacity-80"
                         >
-                            <Settings className="w-4 h-4 mr-2" />
-                            {isAdmin && !isGlobalAdmin
-                              ? (selectedLocation?.city || 'City')
-                              : (selectedLocation ? 'Change City' : 'City')}
+                            <MapPin className="w-4 h-4 mr-2" />
+                            {selectedLocation?.city || 'City'}
                         </Button>
                         <Button
                             onClick={onChangeGender}
                             variant="outline"
                             className="w-full sm:w-auto bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
                         >
-                            <Settings className="w-4 h-4 mr-2" />
-                            {selectedGender ? 'Change Gender' : 'Gender'}
+                            <User className="w-4 h-4 mr-2" />
+                            {selectedGender ? (selectedGender === 'boy' ? 'Boy' : 'Girl') : 'Gender'}
                         </Button>
 
 
