@@ -27,18 +27,14 @@ const getPendingSummary = (pendingRoomData) => {
   if (!pendingRoomData) {
     return { isBatch: false, roomCount: 1, roomType: '1 RK', title: '', total: 150 };
   }
-  const isBatch = Array.isArray(pendingRoomData.rooms) && pendingRoomData.rooms.length > 1;
-  const roomCount = isBatch
-    ? Number(pendingRoomData.roomCount ?? pendingRoomData.rooms.length) || pendingRoomData.rooms.length
-    : 1;
-  const roomType = (isBatch ? pendingRoomData.roomType : pendingRoomData.roomType) || '1 RK';
-  const title = isBatch ? pendingRoomData.title : pendingRoomData.title;
-  const sample = isBatch ? pendingRoomData.rooms?.[0] : pendingRoomData;
-  const studentStream = sample?.studentStream || pendingRoomData.studentStream || DEFAULT_STUDENT_STREAM;
+  // Single-room-with-count model: roomCount stored directly on the room object
+  const roomCount = Number(pendingRoomData.roomCount) || 1;
+  const isBatch = roomCount > 1;
+  const roomType = pendingRoomData.roomType || '1 RK';
+  const title = pendingRoomData.title || '';
+  const studentStream = pendingRoomData.studentStream || DEFAULT_STUDENT_STREAM;
   const unitPrice = getSubscriptionAmount(roomType, studentStream);
-  const total = Number.isFinite(pendingRoomData.totalSubscriptionAmount)
-    ? pendingRoomData.totalSubscriptionAmount
-    : getSubscriptionTotal(roomType, roomCount, studentStream);
+  const total = getSubscriptionTotal(roomType, roomCount, studentStream);
   return { isBatch, roomCount, roomType, title, unitPrice, total };
 };
 
@@ -445,22 +441,15 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       return;
     }
 
-    const rooms = Array.from({ length: roomCount }, (_, i) => ({
-      ...buildRoomPayload(roomCount > 1 ? String(i + 1) : null),
-      id: Date.now() + i
-    }));
+    // Always create a single room payload; roomCount > 1 is stored on the room itself
+    // so the card shows ×2 / ×3 instead of creating duplicate listings.
+    const singleRoom = {
+      ...buildRoomPayload(),
+      id: Date.now(),
+      ...(roomCount > 1 ? { roomCount } : {})
+    };
 
-    if (roomCount > 1) {
-      setPendingRoomData({
-        rooms,
-        roomCount,
-        roomType: formData.roomType,
-        title: baseTitle,
-        totalSubscriptionAmount: getSubscriptionTotal(formData.roomType, roomCount, formData.studentStream)
-      });
-    } else {
-      setPendingRoomData(rooms[0]);
-    }
+    setPendingRoomData(singleRoom);
     setStep('payment');
   };
 
@@ -474,12 +463,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       const result = await onAddRoom(pendingRoomData, paymentMethod);
 
       if (paymentMethod === 'cash') {
-        const count = result?.savedRooms?.length ?? pendingRoomData.rooms?.length ?? 1;
-        setSubmitMessage(
-          count > 1
-            ? `${count} rooms added and cash payment recorded successfully.`
-            : 'Room added and cash payment recorded successfully.'
-        );
+        setSubmitMessage('Room added and cash payment recorded successfully.');
         setTimeout(() => { onClose(); }, 1500);
         return;
       }
@@ -492,7 +476,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       const summary = getPendingSummary(pendingRoomData);
       setAddRoomPaymentFlow({
         path: window.location.pathname,
-        roomCount: savedRooms.length,
+        roomCount: summary.roomCount,
         title: summary.title,
         roomType: summary.roomType
       });
@@ -503,7 +487,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
       await initiatePayment({
         roomId: primary.id,
         roomIds: savedRooms.map((r) => r.id),
-        roomCount: savedRooms.length,
+        roomCount: primary.roomCount || 1,
         roomType: primary.roomType || primary.rooms || '1 RK',
         studentStream: primary.studentStream || formData.studentStream || 'engineering',
         customerName: result.customerName || 'Nivasi Host',
@@ -608,20 +592,16 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin, canCol
           <div className="p-6 space-y-6">
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-5">
               <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                {isBatchPending ? pendingRoomData.title : pendingRoomData.title}
+                {pendingRoomData.title}
               </h3>
               <p className="text-sm text-gray-600 mb-1">
                 {pendingRoomType} · {SUBSCRIPTION_DURATION_DAYS}-day listing subscription
+                {isBatchPending && <span className="ml-1 font-semibold text-orange-600">×{pendingRoomCount}</span>}
               </p>
-              {isBatchPending && (
-                <p className="text-sm text-gray-600 mb-4">
-                  {pendingRoomCount} separate listings · titles numbered (1), (2), …
-                </p>
-              )}
               <div className="flex flex-wrap items-baseline gap-2">
                 {isBatchPending && (
                   <span className="text-sm text-gray-600">
-                    {pendingRoomType} x {pendingRoomCount} · ₹{unitSubscriptionAmount} each =
+                    {pendingRoomType} ×{pendingRoomCount} · ₹{unitSubscriptionAmount} each =
                   </span>
                 )}
                 <span className="text-3xl font-bold text-orange-600">₹{subscriptionAmount}</span>

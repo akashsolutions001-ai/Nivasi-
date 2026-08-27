@@ -284,22 +284,14 @@ const ProfilePage = () => {
     }, []);
 
     const handleAddRoom = useCallback(async (roomData, paymentMethod = 'online') => {
-        const isBatch = roomData?.rooms && Array.isArray(roomData.rooms);
-        const roomsToAdd = isBatch ? roomData.rooms : [roomData];
-
         try {
             const { addRoom } = await import('../services/roomService.js');
-            const savedRooms = [];
+            const savedRoom = await addRoom(roomData, user, false);
 
-            for (const room of roomsToAdd) {
-                const savedRoom = await addRoom(room, user, false);
-                savedRooms.push(savedRoom);
-            }
-
-            setMyRooms((prev) => [...savedRooms, ...prev]);
+            setMyRooms((prev) => [savedRoom, ...prev]);
 
             return {
-                savedRooms,
+                savedRooms: [savedRoom],
                 customerName: user?.displayName || 'Nivasi Host',
                 customerEmail: user?.email || 'payments@nivasi.space'
             };

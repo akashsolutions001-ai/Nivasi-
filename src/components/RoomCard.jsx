@@ -97,6 +97,12 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
           <span className="hidden xs:inline">Hidden</span>
         </div>
       )}
+      {/* Room count badge — shown when a listing represents multiple identical rooms */}
+      {room.roomCount > 1 && (
+        <div className={`absolute ${room.hidden && (isAdmin || isOwner) ? 'top-9' : 'top-2'} left-2 z-10 bg-orange-500/90 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg`}>
+          ×{room.roomCount}
+        </div>
+      )}
       {/* Status Badge — payment takes priority over verification */}
       {(isAdmin || isOwner) && needsPayment && (
         <div className="absolute top-2 right-2 z-10 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow-lg">
@@ -213,8 +219,13 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete
         )}
         {/* Title and Price */}
         <div className="flex-shrink-0">
-          <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2 leading-tight">
-            {room.title}
+          <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight flex items-center gap-2 flex-wrap">
+            <span className="line-clamp-2">{room.title}</span>
+            {room.roomCount > 1 && (
+              <span className="inline-flex items-center bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                ×{room.roomCount}
+              </span>
+            )}
           </h3>
           <div className="price-highlight text-xl font-bold">
             ₹{room.rent.toLocaleString()}/month <span className="text-xs font-semibold">{room.pricingType === 'perRoom' ? t('perRoom') : t('perStudent')}</span>

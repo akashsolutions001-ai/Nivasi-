@@ -437,3 +437,77 @@ export const migrateRoomsToFirestore = async (staticRooms) => {
         throw error;
     }
 };
+
+/**
+ * One-time migration: merge duplicate Firestore rooms that were created by the
+ * old "batch add" flow (titles like "Shrisha Nivas (1)", "Shrisha Nivas (2)"…).
+ *
+ * Groups rooms by baseTitle (stripped of trailing " (N)") + contact + rent.
+ * For each group with > 1 member:
+ *   - Keeps the document with the earliest createdAt (or the first found).
+ *   - Sets roomCount = group.length on the keeper.
+ *   - Hard-deletes the duplicate documents.
+ *
+ * Returns a summary: { merged: number, deleted: number, groups: string[] }
+ */
+export const mergeDuplicateRooms = async () => {
+    try {
+        const roomsRef = collection(db, ROOMS_COLLECTION);
+        const snapshot = await getDocs(roomsRef);
+
+        const allDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        // Strip trailing " (N)" suffix to get the base title
+        const getBaseTitle = (title = '') =>
+            title.replace(/\s*\(\d+\)\s*$/, '').trim();
+
+        // Group by baseTitle|contact|rent
+        const groups = new Map();
+        for (const room of allDocs) {
+            const base = getBaseTitle(room.title);
+            const key = `${base.toLowerCase()}|${(room.contact || '').trim()}|${room.rent}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(room);
+        }
+
+        let merged = 0;
+        let deleted = 0;
+        const groupLabels = [];
+
+        for (const [, members] of groups) {
+            if (members.length <= 1) continue;
+
+            // Sort: earliest createdAt first (Firestore Timestamp or missing)
+            members.sort((a, b) => {
+                const ta = a.createdAt?.seconds ?? 0;
+                const tb = b.createdAt?.seconds ?? 0;
+                return ta - tb;
+            });
+
+            const [keeper, ...dupes] = members;
+            const baseTitle = getBaseTitle(keeper.title);
+            const count = members.length;
+
+            // Update the keeper: set roomCount and strip any " (N)" from its title
+            await updateDoc(doc(db, ROOMS_COLLECTION, keeper.id), {
+                roomCount: count,
+                title: baseTitle,
+                updatedAt: serverTimestamp()
+            });
+
+            // Delete duplicates
+            for (const dupe of dupes) {
+                await deleteDoc(doc(db, ROOMS_COLLECTION, dupe.id));
+                deleted++;
+            }
+
+            merged++;
+            groupLabels.push(`"${baseTitle}" (×${count} → 1)`);
+        }
+
+        return { merged, deleted, groups: groupLabels };
+    } catch (error) {
+        console.error('Error merging duplicate rooms:', error);
+        throw error;
+    }
+};

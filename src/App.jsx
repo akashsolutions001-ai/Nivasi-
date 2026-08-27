@@ -147,6 +147,7 @@ function App() {
   const [subscriptionPayRoom, setSubscriptionPayRoom] = useState(null);
   const [subscriptionPaymentSuccess, setSubscriptionPaymentSuccess] = useState(false);
   const [subscriptionIsRenewal, setSubscriptionIsRenewal] = useState(false);
+  const [isMergingDuplicates, setIsMergingDuplicates] = useState(false);
 
   const materializeStaticRoom = useCallback(async (room) => {
     if (isFirestoreRoom(room)) return room;
@@ -580,49 +581,43 @@ function App() {
   }, [setAdminSession, setSelectedLocation, requireAuth]);
 
   const handleAddRoom = useCallback(async (roomData, paymentMethod = 'online') => {
-    const isBatch = roomData?.rooms && Array.isArray(roomData.rooms);
-    let roomsToAdd = isBatch ? roomData.rooms : [roomData];
+    // Normalize: always a single room object (roomCount field carries quantity)
+    let roomToAdd = roomData;
 
     // College admins can only create rooms for their assigned college/city/stream
     if (isAdmin && !isGlobalAdmin && adminScope) {
-      roomsToAdd = roomsToAdd.map((room) => ({
-        ...room,
+      roomToAdd = {
+        ...roomToAdd,
         city: adminScope.city,
         college: adminScope.college,
-        studentStream: adminScope.studentStream || room.studentStream || 'engineering'
-      }));
+        studentStream: adminScope.studentStream || roomToAdd.studentStream || 'engineering'
+      };
     }
 
     try {
       const { addRoom, activateCashSubscriptionForRooms } = await import('./services/roomService.js');
-      const savedRooms = [];
 
-      for (const room of roomsToAdd) {
-        const savedRoom = await addRoom(room, user, isAdmin);
-        savedRooms.push(savedRoom);
-      }
+      const savedRoom = await addRoom(roomToAdd, user, isAdmin);
+      const savedRooms = [savedRoom];
 
       if (paymentMethod === 'cash') {
         if (!canCollectCash) {
           throw new Error('Not authorized for cash collection');
         }
-        const activated = await activateCashSubscriptionForRooms(savedRooms.map((r) => r.id));
-        const activatedMap = new Map(activated.map((r) => [r.id, r]));
-        const mergedRooms = savedRooms.map((r) => ({ ...r, ...activatedMap.get(r.id) }));
-        setRooms((prev) => deduplicateRooms([...mergedRooms, ...prev]));
+        const activated = await activateCashSubscriptionForRooms([savedRoom.id]);
+        const merged = { ...savedRoom, ...activated[0] };
+        setRooms((prev) => deduplicateRooms([merged, ...prev]));
         setShowAddForm(false);
         setNotification({
-          message: mergedRooms.length > 1
-            ? `${mergedRooms.length} rooms added and cash payment recorded. Listings are now live.`
-            : 'Room added and cash payment recorded. Listing is now live.',
+          message: 'Room added and cash payment recorded. Listing is now live.',
           type: 'success',
           isVisible: true,
           title: 'Cash Payment Recorded'
         });
-        return { savedRooms: mergedRooms };
+        return { savedRooms: [merged] };
       }
 
-      setRooms((prev) => deduplicateRooms([...savedRooms, ...prev]));
+      setRooms((prev) => deduplicateRooms([savedRoom, ...prev]));
       return {
         savedRooms,
         customerName: user?.displayName || 'Nivasi Host',
@@ -658,6 +653,44 @@ function App() {
     });
     return false;
   }, [isAdmin, isGlobalAdmin, adminScope]);
+
+  const handleMergeDuplicates = useCallback(async () => {
+    if (!isGlobalAdmin) return;
+    setIsMergingDuplicates(true);
+    try {
+      const { mergeDuplicateRooms } = await import('./services/roomService.js');
+      const result = await mergeDuplicateRooms();
+
+      if (result.merged === 0) {
+        setNotification({
+          message: 'No duplicate rooms found. Everything looks clean.',
+          type: 'success',
+          isVisible: true,
+          title: 'No Duplicates Found'
+        });
+      } else {
+        // Reload rooms so the UI reflects the merged state
+        const { fetchRooms } = await import('./services/roomService.js');
+        const freshRooms = await fetchRooms();
+        setRooms(deduplicateRooms(freshRooms));
+        setNotification({
+          message: `Merged ${result.merged} group${result.merged > 1 ? 's' : ''}, deleted ${result.deleted} duplicate${result.deleted > 1 ? 's' : ''}. Affected: ${result.groups.join(', ')}`,
+          type: 'success',
+          isVisible: true,
+          title: 'Duplicates Merged'
+        });
+      }
+    } catch (error) {
+      setNotification({
+        message: 'Migration failed: ' + error.message,
+        type: 'error',
+        isVisible: true,
+        title: 'Merge Error'
+      });
+    } finally {
+      setIsMergingDuplicates(false);
+    }
+  }, [isGlobalAdmin]);
 
   const openSubscriptionPayment = useCallback((room) => {
     const isRenewal =
@@ -1216,6 +1249,19 @@ function App() {
               {!isGlobalAdmin && adminScope && (
                 <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
                   College admin scope: <strong>{adminScope.college}</strong> · {adminScope.city}
+                </div>
+              )}
+              {isGlobalAdmin && (
+                <div className="mb-3 flex justify-end">
+                  <Button
+                    onClick={handleMergeDuplicates}
+                    disabled={isMergingDuplicates}
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50 text-xs"
+                  >
+                    {isMergingDuplicates ? 'Merging…' : 'Fix Duplicate Rooms'}
+                  </Button>
                 </div>
               )}
               <AdminMetrics
